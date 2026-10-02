@@ -1,0 +1,10 @@
+fastapi #  framework para hacer la API
+uvicorn # servidor web
+onnxruntime # motor para ejecutar el modelo de IA
+numpy # matemática de vectores
+requests # para descargar fotos si se manda una URL en vez de base64
+opencv-python # para el detector de rostros
+
+
+
+

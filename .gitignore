@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Python Virtual Environments & Cache (face_service)
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Build & Output
+dist/
+build/
+out/
+coverage/
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+atlas-credentials.env
+
+# Local data & uploads
+uploads/
+*.sqlite
+*.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
