@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Camera, 
   User, 
@@ -16,7 +16,9 @@ import {
   Lock,
   Unlock,
   RefreshCw,
-  Check
+  Check,
+  Cloud,
+  AlertCircle
 } from 'lucide-react';
 import type { UserProfile, AccessLog, AccessDirection } from '../types.ts';
 import { getStoredToken, AVATAR_FALLBACK } from '../lib/api.ts';
@@ -40,7 +42,7 @@ export const RecognitionCameraModule: React.FC<RecognitionModuleProps> = ({
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [turnstileOpen, setTurnstileOpen] = useState(false);
 
-  // La estación de cámara es una zona de vigilancia: sus rutas exigen rol admin/security.
+  // La estaci�n de c�mara es una zona de vigilancia: sus rutas exigen rol admin/security.
 const authHeaders = (): Record<string, string> => {
   const token = getStoredToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -63,8 +65,6 @@ const authHeaders = (): Record<string, string> => {
     severity: 'high' | 'medium';
   } | null>(null);
 
-  // Simulated target persona selector for vision testing
-  const [simulatedPersonId, setSimulatedPersonId] = useState<string>('unknown'); // sin persona → rostro no registrado
   const [showContingencyModal, setShowContingencyModal] = useState(false);
 
   // Contingency form state (RF-11)
@@ -136,8 +136,8 @@ const authHeaders = (): Record<string, string> => {
         setIsCameraActive(true);
       }
     } catch (err: any) {
-      console.warn('No se pudo acceder a la cámara física:', err.message);
-      setCameraError('Cámara física no disponible en este entorno. Puedes probar con el simulador de visión biométrica abajo.');
+      console.warn('No se pudo acceder a la c�mara f�sica:', err.message);
+      setCameraError('C�mara f�sica no disponible en este entorno. Puedes probar con el simulador de visi�n biom�trica abajo.');
       setIsCameraActive(false);
     }
   };
@@ -238,7 +238,7 @@ const authHeaders = (): Record<string, string> => {
       ctx.font = '10px monospace';
       ctx.fillStyle = scanning ? '#10b981' : '#f59e0b';
       ctx.fillText(
-        `AI: MOBILENET-V3 • ${direction === 'entry' ? 'ENTRADA' : 'SALIDA'} • 30 FPS`,
+        `AI: YUNET + SFACE (128-D) � ${direction === 'entry' ? 'ENTRADA' : 'SALIDA'} � 30 FPS`,
         boxX,
         boxY - 8
       );
@@ -252,7 +252,19 @@ const authHeaders = (): Record<string, string> => {
     };
   }, [scanning, direction]);
 
-  // Execute Facial Recognition Scan
+  // Upload snapshot to Cloudinary via backend
+  const uploadSnapshotToCloudinary = async (dataUrl: string): Promise<string> => {
+    const res = await fetch('/api/users/me/avatar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ dataUrl, folder: 'recognition_snapshots' }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error subiendo snapshot');
+    return data.avatarUrl;
+  };
+
+  // Execute Facial Recognition Scan - REAL BIOMETRIC RECOGNITION
   const handlePerformScan = async () => {
     if (scanning) return;
     setScanning(true);
@@ -260,7 +272,7 @@ const authHeaders = (): Record<string, string> => {
     setLastResult(null);
 
     // Capture canvas snapshot image
-    let snapshotUrl: string | undefined;
+    let dataUrl: string | undefined;
     if (canvasRef.current && videoRef.current && isCameraActive) {
       try {
         const snapCanvas = document.createElement('canvas');
@@ -269,27 +281,38 @@ const authHeaders = (): Record<string, string> => {
         const snapCtx = snapCanvas.getContext('2d');
         if (snapCtx) {
           snapCtx.drawImage(videoRef.current, 0, 0);
-          snapshotUrl = snapCanvas.toDataURL('image/jpeg', 0.6);
+          dataUrl = snapCanvas.toDataURL('image/jpeg', 0.7);
         }
       } catch {
         // snapshot fallback
       }
     }
 
+    if (!dataUrl) {
+      setLastResult({
+        authorized: false,
+        direction,
+        title: 'Error de Captura',
+        details: 'No se pudo capturar la imagen de la c�mara.',
+        confidence: 0,
+        timestamp: new Date().toLocaleTimeString('es-CO'),
+      });
+      setScanning(false);
+      return;
+    }
+
     try {
-      // Simulate neural network facial embedding inference (850ms latency)
-      await new Promise((res) => setTimeout(res, 850));
+      // Upload snapshot to Cloudinary (for evidence & AI processing)
+      const snapshotUrl = await uploadSnapshotToCloudinary(dataUrl);
 
-      const matchedUserId = simulatedPersonId === 'unknown' ? undefined : simulatedPersonId;
-
+      // Call real biometric verification endpoint
       const res = await fetch('/api/recognition/verify-face', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
-          matchedUserId,
+          snapshotUrl,
           direction,
           entryPoint,
-          snapshotUrl,
         }),
       });
 
@@ -303,8 +326,8 @@ const authHeaders = (): Record<string, string> => {
         setLastResult({
           authorized: true,
           direction,
-          title: `¡${direction === 'entry' ? 'Ingreso' : 'Salida'} Peatonal Autorizado!`,
-          details: `${data.user?.name} (${data.user?.role.toUpperCase()}) • Cédula: ${data.user?.documentId} • ${data.user?.facultyOrDept || ''}`,
+          title: `�${direction === 'entry' ? 'Ingreso' : 'Salida'} Peatonal Autorizado!`,
+          details: `${data.user?.name} (${data.user?.role.toUpperCase()}) � C�dula: ${data.user?.documentId} � ${data.user?.facultyOrDept || ''}`,
           confidence: data.confidence,
           user: data.user,
           timestamp: new Date().toLocaleTimeString('es-CO'),
@@ -318,7 +341,7 @@ const authHeaders = (): Record<string, string> => {
           direction,
           title: `Acceso Peatonal Denegado (${direction === 'entry' ? 'Entrada' : 'Salida'})`,
           details: data.message || 'Rostro no registrado o suspendido en base de datos de Uniminuto.',
-          confidence: data.confidence || 0.4,
+          confidence: data.confidence || 0,
           user: data.user,
           timestamp: new Date().toLocaleTimeString('es-CO'),
         });
@@ -337,7 +360,7 @@ const authHeaders = (): Record<string, string> => {
       setLastResult({
         authorized: false,
         direction,
-        title: 'Error de Red / Visión',
+        title: 'Error de Red / Visi�n',
         details: 'No se pudo comunicar con el servicio de reconocimiento neuronal.',
         confidence: 0,
         timestamp: new Date().toLocaleTimeString('es-CO'),
@@ -376,7 +399,7 @@ const authHeaders = (): Record<string, string> => {
           authorized: true,
           direction,
           title: `Pase Manual de ${direction === 'entry' ? 'Entrada' : 'Salida'} Concedido`,
-          details: `${manualName} (${manualRole}) • Doc: ${manualDoc || 'N/A'} • Torniquete Habilitado`,
+          details: `${manualName} (${manualRole}) � Doc: ${manualDoc || 'N/A'} � Torniquete Habilitado`,
           confidence: 1.0,
           timestamp: new Date().toLocaleTimeString('es-CO'),
         });
@@ -417,11 +440,11 @@ const authHeaders = (): Record<string, string> => {
                 <span className={`text-xs px-2.5 py-0.5 rounded-full border font-bold ${
                   darkMode ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-emerald-100 text-emerald-800 border-emerald-300'
                 }`}>
-                  IA ACTIVA • 4K
+                  IA ACTIVA � 4K
                 </span>
               </h2>
               <p className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Control biométrico manos libres para torniquetes peatonales • Cra 5 UNIMINUTO Ibagué
+                Control biom�trico manos libres para torniquetes peatonales � Cra 5 UNIMINUTO Ibagu�
               </p>
             </div>
           </div>
@@ -466,7 +489,7 @@ const authHeaders = (): Record<string, string> => {
                 ? darkMode ? 'bg-amber-950 border-amber-800 text-amber-300' : 'bg-amber-50 border-amber-300 text-amber-700 shadow-xs'
                 : darkMode ? 'bg-slate-800 border-slate-700 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-400'
             }`}
-            title={soundEnabled ? 'Silenciar alertas acústicas' : 'Activar alertas acústicas'}
+            title={soundEnabled ? 'Silenciar alertas ac�sticas' : 'Activar alertas ac�sticas'}
           >
             {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
@@ -508,10 +531,10 @@ const authHeaders = (): Record<string, string> => {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-white">
-                        Cámara Facial en Vivo Lista
+                        C�mara Facial en Vivo Lista
                       </h4>
                       <p className="text-xs text-slate-300 mt-1">
-                        {cameraError || 'La cámara física se iniciará automáticamente. Puedes probar el reconocimiento con los perfiles del panel derecho.'}
+                        {cameraError || 'La c�mara f�sica se iniciar� autom�ticamente. Puedes probar el reconocimiento con los perfiles del panel derecho.'}
                       </p>
                     </div>
                     <button
@@ -519,7 +542,7 @@ const authHeaders = (): Record<string, string> => {
                       className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white border border-slate-700 transition-colors inline-flex items-center gap-2"
                     >
                       <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-                      Reintentar Iniciar Cámara
+                      Reintentar Iniciar C�mara
                     </button>
                   </div>
                 </div>
@@ -538,7 +561,7 @@ const authHeaders = (): Record<string, string> => {
                 <div className="flex items-center gap-2">
                   <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/85 backdrop-blur-md border border-slate-700 text-[11px] font-mono font-bold text-white shadow-lg">
                     <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                    EN VIVO • {entryPoint}
+                    EN VIVO � {entryPoint}
                   </span>
                 </div>
 
@@ -576,7 +599,7 @@ const authHeaders = (): Record<string, string> => {
                     </div>
                     <div>
                       <div className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
-                        <span>Torniquete Físico:</span>
+                        <span>Torniquete F�sico:</span>
                         <span
                           className={`font-black ${
                             turnstileOpen ? 'text-emerald-300 animate-pulse' : 'text-slate-300'
@@ -588,7 +611,7 @@ const authHeaders = (): Record<string, string> => {
                       <p className="text-[11px] text-slate-300">
                         {turnstileOpen
                           ? `Sensor activado. Registro de ${direction === 'entry' ? 'entrada' : 'salida'} completado.`
-                          : 'Esperando detección facial válida frente al sensor'}
+                          : 'Esperando detecci�n facial v�lida frente al sensor'}
                       </p>
                     </div>
                   </div>
@@ -623,7 +646,7 @@ const authHeaders = (): Record<string, string> => {
                   <Scan className={`w-4 h-4 ${scanning ? 'animate-spin' : ''}`} />
                   <span>
                     {scanning
-                      ? 'Procesando Biometría Facial...'
+                      ? 'Procesando Biometr�a Facial...'
                       : `Escanear Rostro para ${direction === 'entry' ? 'Ingreso' : 'Salida'}`}
                   </span>
                 </button>
@@ -646,7 +669,7 @@ const authHeaders = (): Record<string, string> => {
                 darkMode ? 'text-slate-400' : 'text-slate-600'
               }`}>
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                <span>Modelo: ResNet-50 + Detección de Parpadeo</span>
+                <span>Modelo: YuNet + SFace (128-d)</span>
               </div>
             </div>
 
@@ -721,122 +744,92 @@ const authHeaders = (): Record<string, string> => {
         {/* Right Column: Simulated Persona Selector & Biometric Verification */}
         <div className="lg:col-span-4 space-y-4">
           
-          {/* Persona selector for testing & simulation */}
+          {/* Enrolled Users Reference Panel */}
           <div className={`border rounded-3xl p-5 shadow-xs space-y-4 transition-colors ${
             darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
           }`}>
             <div>
               <h3 className={`text-sm font-black flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                <User className="w-4 h-4 text-blue-500" />
-                <span>Perfil Frente a la Cámara</span>
+                <User className="w-4 h-4 text-emerald-500" />
+                <span>Usuarios Enrolados con Vectores</span>
               </h3>
               <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Selecciona la persona a simular frente al sensor de los torniquetes:
+                Referencia de usuarios con vectores biom�tricos en base de datos. El sistema compara autom�ticamente contra todos.
               </p>
             </div>
 
             <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-              {users.map((u) => {
-                const isSelected = simulatedPersonId === u.id;
-                return (
-                  <button
+              {users
+                .filter(u => u.faceEnrolled)
+                .map((u) => (
+                  <div
                     key={u.id}
-                    onClick={() => {
-                      setSimulatedPersonId(u.id);
-                      setActiveAlert(null);
-                    }}
-                    className={`w-full p-3 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 ${
-                      isSelected
-                        ? darkMode ? 'bg-blue-950/80 border-blue-600 shadow-sm' : 'bg-blue-50/70 border-blue-900 shadow-xs'
-                        : darkMode ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/50' : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-slate-100/70'
+                    className={`p-3 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 ${
+                      darkMode ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <img
                         src={u.avatarUrl || AVATAR_FALLBACK}
                         alt={u.name}
-                        className="w-10 h-10 rounded-full object-cover border-2 border-slate-400 shrink-0"
+                        className="w-10 h-10 rounded-full object-cover border-2 border-emerald-400 shrink-0"
                       />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <h4 className={`text-xs font-bold truncate ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
                             {u.name}
                           </h4>
+                          <span className={`text-[10px] px-2 py-0.5 rounded border font-bold ${
+                            darkMode ? 'bg-emerald-950 border-emerald-700 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                          }`}>
+                            ENROLADO
+                          </span>
                         </div>
                         <p className={`text-[11px] font-mono font-semibold ${darkMode ? 'text-amber-400' : 'text-blue-950'}`}>
-                          CC: {u.documentId} • {u.role}
+                          CC: {u.documentId} � {u.role}
                         </p>
                         <p className={`text-[10px] truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           {u.facultyOrDept}
                         </p>
                       </div>
                     </div>
-
                     <div className="shrink-0">
-                      {isSelected ? (
-                        <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-                      ) : (
-                        <div className={`w-5 h-5 rounded-full border ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-300 bg-white'}`} />
-                      )}
+                      <span className={`text-[10px] font-mono font-bold ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                        ? Vector OK
+                      </span>
                     </div>
-                  </button>
-                );
-              })}
-
-              {/* Option to test unknown / non-registered visitor face */}
-              <button
-                onClick={() => {
-                  setSimulatedPersonId('unknown');
-                  setActiveAlert(null);
-                }}
-                className={`w-full p-3 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 ${
-                  simulatedPersonId === 'unknown'
-                    ? darkMode ? 'bg-rose-950/80 border-rose-600 shadow-sm' : 'bg-rose-50 border-rose-500 shadow-xs'
-                    : darkMode ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center shrink-0">
-                    <UserX className="w-5 h-5" />
                   </div>
-                  <div>
-                    <h4 className={`text-xs font-black ${darkMode ? 'text-rose-300' : 'text-rose-900'}`}>
-                      Rostro No Registrado (Desconocido)
-                    </h4>
-                    <p className={`text-[11px] ${darkMode ? 'text-rose-400' : 'text-rose-700'}`}>
-                      Simula intento de acceso sin perfil en base de datos (RF-08)
-                    </p>
-                  </div>
+                ))}
+              {users.filter(u => u.faceEnrolled).length === 0 && (
+                <div className={`p-4 rounded-xl border text-center ${
+                  darkMode ? 'bg-slate-950 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
+                }`}>
+                  <UserX className="w-8 h-8 mx-auto text-slate-400" />
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    No hay usuarios con enrolamiento biom�trico completo.
+                  </p>
+                  <p className={`text-[10px] mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Usa la pesta�a <strong>Carn� Digital</strong> ? <strong>Enrolamiento Facial</strong> para crear vectores.
+                  </p>
                 </div>
-
-                <div className="shrink-0">
-                  {simulatedPersonId === 'unknown' ? (
-                    <div className="w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center">
-                      <Check className="w-3 h-3 stroke-[3]" />
-                    </div>
-                  ) : (
-                    <div className={`w-5 h-5 rounded-full border ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-300 bg-white'}`} />
-                  )}
-                </div>
-              </button>
-            </div>
+              )}
 
             {/* Quick Helper Notice */}
             <div className={`p-3 rounded-xl border text-[11px] space-y-1 ${
-              darkMode ? 'bg-slate-950 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
+              darkMode ? 'bg-emerald-950/50 border-emerald-800 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-900'
             }`}>
-              <span className={`font-bold block ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                Flujo de Torniquete:
+              <span className={`font-bold block ${darkMode ? 'text-emerald-300' : 'text-emerald-900'}`}>
+                Flujo de Reconocimiento Real (YuNet + SFace):
               </span>
-              <p>
-                Al hacer clic en <strong>Escanear Rostro</strong>, el sistema verifica las características faciales contra la colección <code className="text-amber-400 font-mono">users</code> y comanda la apertura del torniquete en la Cra 5.
-              </p>
+<ul className="space-y-1 ml-4 list-disc text-xs">
+                <li>Captura snapshot - sube a Cloudinary (evidencia)</li>
+                <li>Env�a URL a <code className="font-mono">/api/recognition/verify-face</code></li>
+                <li>Python <code className="font-mono">/embed</code> (YuNet + SFace) - vector 128-d</li>
+                <li>Distancia coseno 1:N vs todos los vectores en MongoDB</li>
+                <li>Distancia = 0.45 - <span className="font-bold">Autorizado</span> / mayor a 0.45 - <span className="font-bold">Denegado + Alerta Celador</span></li>
+              </ul>
             </div>
-
           </div>
-
         </div>
 
       </div>
@@ -859,7 +852,7 @@ const authHeaders = (): Record<string, string> => {
                     Pase de Contingencia Manual (RF-11)
                   </h3>
                   <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Para visitantes, contratistas o fallas en enrolamiento biométrico
+                    Para visitantes, contratistas o fallas en enrolamiento biom�trico
                   </p>
                 </div>
               </div>
@@ -867,14 +860,14 @@ const authHeaders = (): Record<string, string> => {
                 onClick={() => setShowContingencyModal(false)}
                 className={`text-sm font-bold ${darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-700'}`}
               >
-                ✕
+                ?
               </button>
             </div>
 
             <form onSubmit={handleContingencySubmit} className="space-y-4">
               <div className="space-y-1">
                 <label className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Dirección del Paso
+                  Direcci�n del Paso
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -911,7 +904,7 @@ const authHeaders = (): Record<string, string> => {
                   required
                   value={manualName}
                   onChange={(e) => setManualName(e.target.value)}
-                  placeholder="Ej: Visitante Juan Pérez"
+                  placeholder="Ej: Visitante Juan P�rez"
                   className={`w-full px-3.5 py-2.5 rounded-xl border text-xs focus:outline-hidden ${
                     darkMode 
                       ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-blue-500' 
@@ -923,7 +916,7 @@ const authHeaders = (): Record<string, string> => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Cédula / Documento
+                    C�dula / Documento
                   </label>
                   <input
                     type="text"
@@ -961,13 +954,13 @@ const authHeaders = (): Record<string, string> => {
 
               <div className="space-y-1">
                 <label className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Observación de Vigilancia
+                  Observaci�n de Vigilancia
                 </label>
                 <textarea
                   rows={2}
                   value={manualNotes}
                   onChange={(e) => setManualNotes(e.target.value)}
-                  placeholder="Motivo del pase manual (ej: carné en trámite, visita a secretaría)..."
+                  placeholder="Motivo del pase manual (ej: carn� en tr�mite, visita a secretar�a)..."
                   className={`w-full px-3.5 py-2 rounded-xl border text-xs resize-none focus:outline-hidden ${
                     darkMode 
                       ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-blue-500' 
@@ -999,5 +992,6 @@ const authHeaders = (): Record<string, string> => {
       )}
 
     </div>
+  </div>
   );
 };

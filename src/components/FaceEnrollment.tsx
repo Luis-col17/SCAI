@@ -19,11 +19,30 @@ type FaceService = { configured: boolean; url: string | null; reason: string | n
 interface FaceEnrollmentProps {
   userId: string;
   darkMode?: boolean;
+  onRefresh?: () => void;
 }
 
 const MAX_PHOTOS = 5;
 const MAX_DIMENSION = 720;
 const JPEG_QUALITY = 0.82;
+const MIN_ENROLLMENT_PHOTOS = 3;
+
+const RECOMMENDATIONS = [
+  { icon: '☀️', title: 'Buena iluminación', desc: 'Luz frontal suave, evita sombras duras o contraluz' },
+  { icon: '🧱', title: 'Fondo neutro', desc: 'Pared lisa, sin objetos ni personas detrás' },
+  { icon: '👓', title: 'Sin accesorios', desc: 'Quita gafas, gorras o elementos que cubran la cara' },
+  { icon: '👁️', title: 'Mira a la cámara', desc: 'Mantén la mirada fija en el objetivo' },
+  { icon: '📏', title: 'Distancia adecuada', desc: 'Mantente a 50-80 cm de la cámara' },
+  { icon: '😐', title: 'Expresión neutra', desc: 'Relaja la cara, no sonrías ni frunzas el ceño' },
+] as const;
+
+const ENROLLMENT_POSES = [
+  { id: 'front', label: 'Frontal', instruction: 'Mira de frente a la cámara', passed: false, icon: '👁️' },
+  { id: 'right', label: 'Perfil derecho', instruction: 'Gira ligeramente la cabeza a la derecha', passed: false, icon: '➡️' },
+  { id: 'left', label: 'Perfil izquierdo', instruction: 'Gira ligeramente la cabeza a la izquierda', passed: false, icon: '⬅️' },
+  { id: 'up', label: 'Mentón arriba', instruction: 'Levanta ligeramente el mentón', passed: false, icon: '⬆️' },
+  { id: 'down', label: 'Mentón abajo', instruction: 'Baja ligeramente el mentón', passed: false, icon: '⬇️' },
+] as const;
 
 const STATUS_COPY: Record<EnrollmentStatus, { label: string; detail: string; tone: 'warn' | 'pending' | 'ok' }> = {
   none: {
@@ -91,7 +110,7 @@ function drawScaled(
   return canvas.toDataURL('image/jpeg', JPEG_QUALITY);
 }
 
-export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode = false }) => {
+export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode = false, onRefresh }) => {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [faceService, setFaceService] = useState<FaceService | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,9 +121,16 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode
   const [consent, setConsent] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const [currentPoseIndex, setCurrentPoseIndex] = useState(0);
+  const [capturing, setCapturing] = useState(false);
+  const [captureDelay, setCaptureDelay] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Track which pose indices have been captured (for minimum 3 check)
+  const capturedPoseIndices = useRef<Set<number>>(new Set());
 
   const card = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200';
   const muted = darkMode ? 'text-slate-400' : 'text-slate-500';
@@ -137,6 +163,11 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     setCameraOn(false);
+    setShowRecommendations(false);
+    setCurrentPoseIndex(0);
+    setCapturing(false);
+    setCaptureDelay(false);
+    capturedPoseIndices.current.clear();
   }, []);
 
   useEffect(() => stopCamera, [stopCamera]);
@@ -147,6 +178,12 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode
       setCameraError('Este navegador no permite usar la camara');
       return;
     }
+    setShots([]);
+    setCurrentPoseIndex(0);
+    setCapturing(false);
+    setCaptureDelay(false);
+    capturedPoseIndices.current.clear();
+    setShowRecommendations(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1280 } },
@@ -170,7 +207,28 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode
   const capture = () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
-    setShots(prev => (prev.length >= MAX_PHOTOS ? prev : [...prev, drawScaled(video, video.videoWidth, video.videoHeight, true)]));
+    if (capturing || captureDelay) return; // Evitar doble captura
+
+    setCapturing(true);
+    // Capturar frame actual
+    const photoDataUrl = drawScaled(video, video.videoWidth, video.videoHeight, true);
+    const newShotIndex = shots.length;
+    setShots(prev => {
+      const newShots = [...prev, photoDataUrl];
+      return newShots.slice(0, MAX_PHOTOS);
+    });
+    capturedPoseIndices.current.add(currentPoseIndex);
+
+    // Esperar 1 segundo antes de avanzar a la siguiente pose
+    setCaptureDelay(true);
+    setTimeout(() => {
+      const nextIndex = currentPoseIndex + 1;
+      if (nextIndex < ENROLLMENT_POSES.length && newShotIndex < MAX_PHOTOS - 1) {
+        setCurrentPoseIndex(nextIndex);
+      }
+      setCaptureDelay(false);
+      setCapturing(false);
+    }, 1000);
   };
 
   const addFromFile = async (files: FileList | null) => {
@@ -188,7 +246,10 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode
   };
 
   const submit = async () => {
-    if (shots.length === 0 || !consent) return;
+    if (shots.length < MIN_ENROLLMENT_PHOTOS || !consent) {
+      setError(`Se requieren mínimo ${MIN_ENROLLMENT_PHOTOS} fotos para enrolar el rostro. Captura las poses restantes.`);
+      return;
+    }
     // Aviso local: un canvas vacio produce 'data:,' y el servidor lo rechaza
     // con un 400 dificil de entender si no se dice que foto fue.
     const invalid = shots.findIndex(
@@ -221,6 +282,7 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode
         setNotice(`${data.pendingReason || 'Rostro enrolado.'} ${data.orphanedPhotos.length} foto(s) anterior(es) quedaron en el almacen externo.`);
       }
       await loadState();
+      onRefresh?.();
     } catch {
       setError('No se pudo guardar el enrolamiento');
     } finally {
@@ -304,32 +366,93 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode
         </div>
       )}
 
-      {cameraOn && (
-        <div className="space-y-2">
-          <div className="relative rounded-xl overflow-hidden bg-black">
-            <video ref={videoRef} playsInline muted className="w-full aspect-4/3 object-cover transform -scale-x-100" />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-40 h-52 rounded-[50%] border-2 border-dashed border-amber-400/80" />
+      {showRecommendations && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-6 space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                <Info className="w-5 h-5 text-blue-500 mr-2" />
+                Recomendaciones para mejor captura
+              </h3>
+              <button
+                onClick={() => {
+                  setShowRecommendations(false);
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
             </div>
+
+            <div className="space-y-3">
+              {RECOMMENDATIONS.map((rec, i) => (
+                <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+                  <span className="text-2xl shrink-0">{rec.icon}</span>
+                  <div>
+                    <p className="font-bold text-sm text-slate-900 dark:text-white">{rec.title}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{rec.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                setShowRecommendations(false);
+              }}
+              className="w-full mt-2 px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm transition-colors"
+            >
+              Continuar a la cámara →
+            </button>
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={capture}
-              disabled={shots.length >= MAX_PHOTOS}
-              className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase border disabled:opacity-50 ${darkMode ? 'bg-amber-500 text-blue-950 border-amber-400' : 'bg-amber-400 text-blue-950 border-amber-500'
-                }`}
-            >
-              <Camera className="w-3.5 h-3.5" />
-              Capturar ({shots.length}/{MAX_PHOTOS})
-            </button>
-            <button
-              type="button"
-              onClick={stopCamera}
-              className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase border ${chip}`}
-            >
-              Cerrar
-            </button>
+        </div>
+      )}
+
+      {cameraOn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-4 space-y-3 animate-in zoom-in-95 duration-200">
+            <div className="relative rounded-xl overflow-hidden bg-black">
+              <video ref={videoRef} playsInline muted className="w-full aspect-4/3 object-cover transform -scale-x-100" />
+              {/* Overlay de pose actual */}
+              {ENROLLMENT_POSES[currentPoseIndex] && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <div className="w-40 h-52 rounded-[50%] border-2 border-dashed border-amber-400/80" />
+                  <div className="absolute top-4 text-center text-white text-sm font-medium bg-black/70 px-3 py-1 rounded">
+                    {ENROLLMENT_POSES[currentPoseIndex].icon ?? '👁️'} {ENROLLMENT_POSES[currentPoseIndex].label}
+                  </div>
+                  <div className="absolute bottom-4 text-center text-white text-xs bg-black/70 px-3 py-1 rounded">
+                    {ENROLLMENT_POSES[currentPoseIndex].instruction}
+                  </div>
+                </div>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-40 h-52 rounded-[50%] border-2 border-dashed border-amber-400/80" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={capture}
+                disabled={shots.length >= MAX_PHOTOS || capturing || captureDelay}
+                className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase border disabled:opacity-50 ${darkMode ? 'bg-amber-500 text-blue-950 border-amber-400' : 'bg-amber-400 text-blue-950 border-amber-500'
+                  }`}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                {capturing ? 'Capturando...' : `Capturar (${shots.length + 1}/${MAX_PHOTOS})`}
+              </button>
+              <button
+                type="button"
+                onClick={stopCamera}
+                className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase border ${chip}`}
+              >
+                Cerrar
+              </button>
+            </div>
+            {/* Mostrar progreso de poses */}
+            <div className="text-[8px] text-slate-500 dark:text-slate-400 mt-1 text-center">
+              Pose {currentPoseIndex + 1} de {ENROLLMENT_POSES.length} · {shots.length}/{MAX_PHOTOS} fotos capturadas
+              {captureDelay && ' · Capturada, preparando siguiente pose...'}
+            </div>
           </div>
         </div>
       )}
@@ -345,26 +468,6 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode
             <Camera className="w-3.5 h-3.5" />
             Abrir camara
           </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase border ${darkMode ? 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-              }`}
-          >
-            <Upload className="w-3.5 h-3.5" />
-            Subir imagenes
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            className="hidden"
-            onChange={(event) => {
-              void addFromFile(event.target.files);
-              event.target.value = '';
-            }}
-          />
         </div>
       )}
 
@@ -374,14 +477,6 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode
             {shots.map((shot, index) => (
               <div key={index} className="relative shrink-0">
                 <img src={shot} alt={`Captura ${index + 1}`} className="w-14 h-14 rounded-lg object-cover border border-slate-300" />
-                <button
-                  type="button"
-                  onClick={() => setShots(prev => prev.filter((_, i) => i !== index))}
-                  className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5"
-                  aria-label={`Quitar foto ${index + 1}`}
-                >
-                  <X className="w-3 h-3" />
-                </button>
               </div>
             ))}
           </div>

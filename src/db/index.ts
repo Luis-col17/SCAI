@@ -222,6 +222,14 @@ export async function getAllUsers() {
   return store.users.map(u => toSafeUser(u));
 }
 
+export async function getAllUsersWithEmbeddings() {
+  if (mongoReady()) {
+    const docs = await UserModel.find({ faceEmbeddings: { $exists: true } }).sort({ createdAt: -1 }).lean();
+    return docs.map(d => fromMongoUser(d)).filter(u => u.faceEmbeddings?.length);
+  }
+  return store.users.filter(u => u.faceEmbeddings?.length);
+}
+
 export async function createUser(data: {
   name: string;
   email: string;

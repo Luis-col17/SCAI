@@ -19,12 +19,13 @@ import {
   updatePasswordHash,
   saveFaceEnrollment,
   summarizeEnrollment,
+getAllUsersWithEmbeddings,
 } from './src/db/index.ts';
 import { connectToMongoDB, getMongoConnectionStatus } from './src/db/mongo/connection.ts';
 import { storeImage, removeImage, isCloudinaryConfigured, parseDataUrl } from './src/lib/imageStorage.ts';
 import { signSessionToken, verifySessionToken } from './src/lib/jwt.ts';
 import { hashPassword, verifyPassword, validatePasswordStrength } from './src/lib/password.ts';
-import { getFaceServiceStatus, requestFaceEmbeddings } from './src/lib/faceService.ts';
+import { getFaceServiceStatus, requestFaceEmbeddings, identifyFace } from './src/lib/faceService.ts';
 import {
   checkLoginAttempt,
   recordLoginFailure,
@@ -206,7 +207,7 @@ async function startServer() {
   // Sign Up / Register
   app.post('/api/auth/sign-up', async (req, res) => {
     try {
-      const { name, email, password, documentId, facultyOrDept, phone } = req.body;
+      const { name, email, password, documentId, facultyOrDept, phone, role } = req.body;
       if (!name || !email || !password || !documentId) {
         return res.status(400).json({ error: 'Nombre, correo institucional, cédula y contraseña son requeridos' });
       }
@@ -220,9 +221,8 @@ async function startServer() {
         name,
         email,
         password,
-        // El registro público es solo para estudiantes. Cualquier otro rol
-        // lo concede coordinación (POST /api/users) o la administración.
-        role: 'student',
+        // Registro público: permite seleccionar rol (excepto admin por seguridad)
+        role: (role && ['student', 'teacher', 'staff', 'security', 'visitor'].includes(role)) ? role : 'student',
         documentId,
         facultyOrDept,
         phone,
@@ -395,6 +395,25 @@ async function startServer() {
     }
   });
 
+  // Subir snapshot de reconocimiento (para evidencia y procesamiento IA)
+  app.post('/api/users/me/avatar', authenticateToken, async (req, res) => {
+    try {
+      const sessionUser = (req as any).user as { id: string; role: UserRole };
+      const target = await findUserById(sessionUser.id);
+      if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+      const stored = await storeImage({
+        dataUrl: req.body?.dataUrl,
+        folder: 'recognition_snapshots',
+        publicId: `recognition_${target.id}_${Date.now()}`,
+      });
+
+      res.json({ avatarUrl: stored.url, avatarPublicId: stored.publicId, provider: stored.provider });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   app.delete('/api/users/:id/avatar', authenticateToken, async (req, res) => {
     try {
       const sessionUser = (req as any).user as { id: string; role: UserRole };
@@ -498,10 +517,19 @@ async function startServer() {
           throw uploadError;
         }
 
-        // Vectores: el servicio de IA todavia no existe, quedan pendientes.
-        const vectors = await requestFaceEmbeddings(dataUrls as string[]);
+        // Vectores: usa las URLs de Cloudinary (ya subidas arriba).
+        const cloudinaryUrls = photos.map(p => p.photoUrl);
+        const vectors = await requestFaceEmbeddings(cloudinaryUrls);
 
         const enrollment = await saveFaceEnrollment(target.id, { photos, embeddings: vectors ?? [] });
+
+        // Actualizar avatar del usuario con la primera foto del enrolamiento (frontal)
+        if (photos.length > 0) {
+          await updateUser(target.id, {
+            avatarUrl: photos[0].photoUrl,
+            avatarPublicId: photos[0].photoPublicId,
+          });
+        }
 
         // Las fotos anteriores dejan de ser necesarias: se borran del almacen.
         const previousPhotos = (target.enrollmentPhotos ?? [])
@@ -603,7 +631,6 @@ async function startServer() {
   app.post('/api/recognition/verify-face', authenticateToken, requireRole('admin', 'security'), async (req, res) => {
     try {
       const {
-        matchedUserId,
         direction = 'entry', // 'entry' (Entrada) | 'exit' (Salida)
         entryPoint = direction === 'entry' ? 'Torniquetes Entrada Cra 5' : 'Torniquetes Salida Cra 5',
         snapshotUrl,
@@ -613,17 +640,25 @@ async function startServer() {
       const isEntry = direction === 'entry';
       const actionName = isEntry ? 'Ingreso' : 'Salida';
 
-      if (!matchedUserId) {
-        // Persona no identificada en el sistema
+      if (!snapshotUrl) {
+        return res.status(400).json({ error: 'snapshotUrl es obligatorio' });
+      }
+
+      // La IA decide quién es (o si no es nadie).
+      const { match, distance } = await identifyFace(snapshotUrl);
+      const confidence = match ? Number((1 - distance).toFixed(4)) : 0;
+
+      if (!match) {
+        // Persona no identificada en la BD -> bitácora + alerta al celador (fase 3)
         const deniedLog = await addAccessLog({
           direction: direction as AccessDirection,
           entryPoint,
           method: 'facial_recognition',
           status: 'denied',
           userName: 'Persona No Identificada',
-          userRole: 'desconocido',
-          confidenceScore: 0.41,
-          notes: manualNotes || `ALERTA (RF-08): Rostro no registrado en Uniminuto. Torniquete de ${actionName} bloqueado.`,
+          userRole: 'desconocido' as UserRole | 'desconocido',
+          confidenceScore: confidence,
+          notes: manualNotes || `ALERTA (RF-08): Rostro no reconocido en Uniminuto. Torniquete de ${actionName} bloqueado. Distancia: ${distance.toFixed(3)}`,
           snapshotUrl,
         });
 
@@ -640,27 +675,17 @@ async function startServer() {
         });
       }
 
-        const user = await findUserById(matchedUserId);
-        if (!user) {
-          return res.status(404).json({ error: 'Perfil de usuario no encontrado' });
-        }
+      const user = match;
+      const enrollment = summarizeEnrollment(user);
+      if (enrollment.status !== 'enrolled') {
+        return res.status(409).json({
+          error: 'El usuario no tiene enrolamiento facial completo.',
+          enrollmentStatus: enrollment.status,
+          authorized: false,
+        });
+      }
 
-        // No se puede "reconocer" a quien no tiene enrolment real: sin vectores
-        // no hay nada que comparar. Antes esta ruta aceptaba cualquier id.
-        const enrollment = summarizeEnrollment(user);
-        if (enrollment.status !== 'enrolled') {
-          return res.status(409).json({
-            error:
-              enrollment.status === 'photos_pending'
-                ? 'El usuario tiene fotos capturadas pero sin vectores: el reconocimiento facial no esta operativo todavia.'
-                : 'El usuario no tiene enrolamiento facial registrado.',
-            enrollmentStatus: enrollment.status,
-            authorized: false,
-          });
-        }
-
-        const isAuthorized: AccessStatus = user.status === 'active' ? 'authorized' : 'denied';
-        const confidence = Number((0.94 + Math.random() * 0.05).toFixed(2));
+      const isAuthorized: AccessStatus = user.status === 'active' ? 'authorized' : 'denied';
 
       const logNotes = isAuthorized === 'authorized'
         ? `${actionName} peatonal autorizado por reconocimiento facial (${(confidence * 100).toFixed(1)}%). Torniquete habilitado.`
@@ -673,7 +698,7 @@ async function startServer() {
         status: isAuthorized,
         userId: user.id,
         userName: user.name,
-        userRole: user.role,
+        userRole: user.role as UserRole,
         documentId: user.documentId,
         confidenceScore: confidence,
         notes: logNotes,

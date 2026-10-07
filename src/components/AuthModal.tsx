@@ -183,7 +183,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <option value="teacher">Docente</option>
                     <option value="staff">Administrativo</option>
                     <option value="security">Vigilancia</option>
-                    <option value="admin">Administrador</option>
                     <option value="visitor">Visitante</option>
                   </select>
                 </div>
