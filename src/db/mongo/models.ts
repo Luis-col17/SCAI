@@ -22,6 +22,7 @@ export interface IUser {
     photoPublicId: string; // public_id de Cloudinary (retención/borrado)
   }[];
   status: UserStatus;
+  sessionInvalidBefore?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -99,10 +100,15 @@ export const UserMongoSchema = new Schema<IUser>(
       ],
       default: undefined,
     },
-    status: {
+        status: {
       type: String,
       enum: ['active', 'suspended'],
       default: 'active',
+      index: true,
+    },
+    sessionInvalidBefore: {
+      type: Date,
+      default: null,
       index: true,
     },
   },

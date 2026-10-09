@@ -12,8 +12,13 @@ function mongoReady() {
 
 export type StoredUser = UserProfile & {
   passwordHash: string;
-  faceEmbeddings?: number[][]; // una fila por captura/enrolamiento (multi-template ML futuro)
-  enrollmentPhotos?: EnrollmentPhotoRef[]; // referencias Cloudinary de las N fotos de enrolamiento
+  faceEmbeddings?: number[][];
+  enrollmentPhotos?: EnrollmentPhotoRef[];
+  /**
+   * Fecha a partir de la cual los tokens emitidos quedan inválidos.
+   * Se usa al cambiar la contraseña para forzar re-login en todos los dispositivos.
+   */
+  sessionInvalidBefore?: Date | string;
 };
 
 export type EnrollmentPhotoRef = {
@@ -79,6 +84,7 @@ function toMongoUser(u: StoredUser) {
       photoPublicId: p.photoPublicId,
     })),
     status: u.status,
+    sessionInvalidBefore: u.sessionInvalidBefore ? new Date(u.sessionInvalidBefore) : undefined,
     createdAt: u.createdAt ? new Date(u.createdAt) : undefined,
   };
 }
@@ -102,6 +108,7 @@ function fromMongoUser(doc: any): StoredUser {
       photoPublicId: p.photoPublicId,
     })),
     faceEmbeddings: doc.faceEmbeddings ?? [],
+    sessionInvalidBefore: doc.sessionInvalidBefore ? new Date(doc.sessionInvalidBefore) : undefined,
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
     updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : undefined,
   };
@@ -188,6 +195,42 @@ export async function revokeToken(jti: string, userId: string, expiresAt: Date):
   }
 
   store.revokedTokens.set(jti, { userId, expiresAt });
+}
+
+/**
+ * Revoca TODAS las sesiones activas de un usuario.
+ *
+ * ⚠️ IMPORTANTE: por cómo funciona el JWT (stateless), no podemos "saber"
+ * qué tokens están activos sin consultar la colección de revocados + los
+ * tokens que aún no han expirado pero tampoco han sido revocados.
+ *
+ * Estrategia práctica:
+ *  1. Se marca al usuario con `sessionInvalidBefore: now` en su documento.
+ *  2. El middleware `authenticateToken` valida que `claims.iat >= sessionInvalidBefore`.
+ *  3. Así, cualquier token emitido ANTES de este cambio queda inválido.
+ *
+ * Nota: esto requiere que el modelo User tenga el campo `sessionInvalidBefore`.
+ * Si no lo tiene, se revocan explícitamente los tokens actuales en memoria.
+ */
+export async function revokeAllUserTokens(userId: string): Promise<void> {
+  if (!userId) return;
+
+  const now = new Date();
+
+  if (mongoReady()) {
+    // Marcar al usuario con la fecha de invalidación
+    await UserModel.updateOne(
+      { businessId: userId },
+      { $set: { sessionInvalidBefore: now, updatedAt: now.toISOString() } }
+    );
+    return;
+  }
+
+  // Modo memoria: marcar en el store
+  const user = store.users.find((u) => u.id === userId);
+  if (user) {
+    (user as any).sessionInvalidBefore = now;
+  }
 }
 
 // Users helpers
