@@ -1,16 +1,24 @@
-# React + Vite
+## 🎯 Cambios principales
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+### ✨ Nuevas funcionalidades
+- **Vista de edición de perfil** (`EditProfileView.tsx`) con preview en vivo
+- **Modal de cambio de contraseña** (`ChangePasswordModal.tsx`)
+- **Endpoint** `PATCH /api/users/me` para editar datos propios
+- **Endpoint** `PATCH /api/users/me/password` para cambiar contraseña
+- **Revocación global de sesiones** al cambiar contraseña (`sessionInvalidBefore`)
 
-Currently, two official plugins are available:
+### 🎨 UI/UX
+- Navbar con dropdown mejorado:
+  - Editar información
+  - Cambiar contraseña
+  - Cambiar tema (claro/oscuro) ← movido del navbar al dropdown
+  - Cerrar sesión
+- Logo SCAI adaptativo (claro/oscuro)
+- Fondo ripple cyan decorativo
+- Vista web responsive (`WebAppView`)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+### 🔒 Seguridad
+- Validación de política de contraseñas reutilizable
+- Revocación de tokens al cambiar contraseña (fuerza re-login global)
+- Validación de `sessionInvalidBefore` en `authenticateToken`
+- Validación de campos editables (`name`, `phone`, `facultyOrDept`)
