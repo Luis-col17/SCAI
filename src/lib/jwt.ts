@@ -8,18 +8,32 @@ export type SessionClaims = {
   name: string;
   documentId: string;
   jti: string;
+  issuedAt: Date;
   expiresAt: Date;
 };
 
-const SESSION_TTL_SECONDS = 24 * 60 * 60;
+// ⏱ TTL bajado de 24h a 8h: reduce ventana de ataque si roban el token.
+// Si el usuario necesita más, el frontend puede renovar pidiendo login de nuevo.
+const SESSION_TTL_SECONDS = 8 * 60 * 60;
+
 const ISSUER = 'uniminuto-acceso';
 const AUDIENCE = 'uniminuto-app';
 const ALGORITHM = 'HS256' as const;
+
+// 🔒 HS256 requiere mínimo 256 bits = 32 bytes. Menos que esto es crackeable.
+const MIN_SECRET_LENGTH = 32;
 
 function getSecret(): string {
   const secret = process.env.SESSION_SECRET || process.env.BETTER_AUTH_SECRET;
   if (!secret) {
     throw new Error('Falta configurar SESSION_SECRET en el archivo .env');
+  }
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `SESSION_SECRET demasiado corto (${secret.length} chars). ` +
+      `Requiere al menos ${MIN_SECRET_LENGTH} caracteres. ` +
+      `Genera uno con: node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
+    );
   }
   return secret;
 }
@@ -37,8 +51,11 @@ export function signSessionToken(user: {
   const token = jwt.sign(
     {
       role: user.role,
-      name: user.name,
-      documentId: user.documentId,
+      // 🔒 SEGURIDAD: no incluimos name ni documentId en el JWT.
+      // El JWT está firmado pero NO encriptado: cualquiera con el token
+      // puede leer el payload en jwt.io. La cédula es dato sensible
+      // (Ley 1581) y no debe viajar en el token.
+      // Estos datos se obtienen del endpoint /api/auth/me (que consulta la DB).
     },
     getSecret(),
     {
@@ -58,9 +75,10 @@ export function verifySessionToken(token: string): SessionClaims | null {
   let payload: jwt.JwtPayload | string;
   try {
     payload = jwt.verify(token, getSecret(), {
-      algorithms: [ALGORITHM],
+      algorithms: [ALGORITHM], // solo HS256, rechaza alg=none y confusion
       issuer: ISSUER,
       audience: AUDIENCE,
+      clockTolerance: 5, // tolera 5s de desfase de reloj entre servidores
     });
   } catch {
     return null;
@@ -76,6 +94,7 @@ export function verifySessionToken(token: string): SessionClaims | null {
     name: String(payload.name ?? ''),
     documentId: String(payload.documentId ?? ''),
     jti: String(payload.jti ?? ''),
+    issuedAt: new Date((payload.iat ?? 0) * 1000),
     expiresAt: new Date((payload.exp ?? 0) * 1000),
   };
 }
