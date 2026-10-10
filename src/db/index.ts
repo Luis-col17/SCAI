@@ -14,6 +14,7 @@ export type StoredUser = UserProfile & {
   passwordHash: string;
   faceEmbeddings?: number[][];
   enrollmentPhotos?: EnrollmentPhotoRef[];
+  lastEnrollmentAt?: Date | string;
   /**
    * Fecha a partir de la cual los tokens emitidos quedan inválidos.
    * Se usa al cambiar la contraseña para forzar re-login en todos los dispositivos.
@@ -84,6 +85,7 @@ function toMongoUser(u: StoredUser) {
       photoPublicId: p.photoPublicId,
     })),
     status: u.status,
+    lastEnrollmentAt: u.lastEnrollmentAt ? new Date(u.lastEnrollmentAt) : undefined,
     sessionInvalidBefore: u.sessionInvalidBefore ? new Date(u.sessionInvalidBefore) : undefined,
     createdAt: u.createdAt ? new Date(u.createdAt) : undefined,
   };
@@ -108,6 +110,7 @@ function fromMongoUser(doc: any): StoredUser {
       photoPublicId: p.photoPublicId,
     })),
     faceEmbeddings: doc.faceEmbeddings ?? [],
+    lastEnrollmentAt: doc.lastEnrollmentAt ? new Date(doc.lastEnrollmentAt).toISOString() : undefined,
     sessionInvalidBefore: doc.sessionInvalidBefore ? new Date(doc.sessionInvalidBefore) : undefined,
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
     updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : undefined,
@@ -381,19 +384,19 @@ export async function saveFaceEnrollment(
   const photos = (payload.photos ?? []).filter((p) => p?.photoUrl);
   const faceEnrolled = vectors.length > 0;
   const updatedAt = new Date().toISOString();
+  // 🕒 Marca de tiempo: solo actualiza si hay fotos (no en borrado)
+  const lastEnrollmentAt = photos.length > 0 ? updatedAt : undefined;
 
   if (mongoReady()) {
-    await UserModel.updateOne(
-      { businessId: id },
-      {
-        $set: {
-          enrollmentPhotos: photos.map((p) => ({ photoUrl: p.photoUrl, photoPublicId: p.photoPublicId })),
-          faceEmbeddings: vectors,
-          faceEnrolled,
-          updatedAt,
-        },
-      }
-    );
+    const set: any = {
+      enrollmentPhotos: photos.map((p) => ({ photoUrl: p.photoUrl, photoPublicId: p.photoPublicId })),
+      faceEmbeddings: vectors,
+      faceEnrolled,
+      updatedAt,
+    };
+    if (lastEnrollmentAt) set.lastEnrollmentAt = new Date(lastEnrollmentAt);
+
+    await UserModel.updateOne({ businessId: id }, { $set: set });
     const doc = await UserModel.findOne({ businessId: id }).lean();
     if (!doc) throw new Error('Usuario no encontrado');
     return summarizeEnrollment(fromMongoUser(doc));
@@ -407,6 +410,7 @@ export async function saveFaceEnrollment(
     faceEmbeddings: vectors,
     faceEnrolled,
     updatedAt,
+    ...(lastEnrollmentAt && { lastEnrollmentAt }),
   } as StoredUser;
   return summarizeEnrollment(store.users[atIndex]);
 }
