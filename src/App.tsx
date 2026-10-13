@@ -4,6 +4,7 @@ import { AuthModal } from './components/AuthModal.tsx';
 import { MobileAppView } from './components/MobileAppView.tsx';
 import { WebAppView } from './components/WebAppView.tsx';
 import { RecognitionCameraModule } from './components/RecognitionCameraModule.tsx';
+import { FaceEnrollmentView } from './components/FaceEnrollmentView.tsx';
 import { AdminDashboard } from './components/AdminDashboard.tsx';
 import { TechnicalInfoModal } from './components/TechnicalInfoModal.tsx';
 import { EditProfileView } from './components/EditProfileView.tsx';
@@ -21,7 +22,7 @@ const SCAI_LOGO_DARK = '/img/logooscuro.png';
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'mobile' | 'camera' | 'admin'>('mobile');
+  const [activeTab, setActiveTab] = useState<'mobile' | 'camera' | 'enrollment' | 'admin'>('mobile');
   const [darkMode, setDarkMode] = useState(false);
 
   // 🖥️ Vista activa: 'main' (contenido normal) o 'edit-profile' (vista de edición)
@@ -141,6 +142,7 @@ export default function App() {
     storeToken(token);
     localStorage.setItem(SESSION_KEY, JSON.stringify({ user, token }));
     setActiveView('main');
+    setActiveTab('mobile');
   };
 
   const handleLogout = () => {
@@ -149,7 +151,7 @@ export default function App() {
     setAuthToken(null);
     clearStoredToken();
     localStorage.removeItem(SESSION_KEY);
-    // 🔒 Volver al tab permitido: si estaba en cámara/admin, quedaría bloqueado.
+    // 🔒 Volver al tab permitido: si estaba en cámara/admin/enrolamiento, quedaría bloqueado.
     setActiveTab('mobile');
     setActiveView('main');
   };
@@ -482,7 +484,42 @@ export default function App() {
             )}
 
             {/* ═══════════════════════════════════════════════════════════════════
-                VIEW 3: PANEL DE ADMINISTRACIÓN
+                VIEW 3: ENROLAMIENTO FACIAL
+                Solo para admin/security
+                ═══════════════════════════════════════════════════════════════════ */}
+            {activeTab === 'enrollment' && (
+              <div className="animate-in fade-in duration-200">
+                {currentUser && (currentUser.role === 'admin' || currentUser.role === 'security') ? (
+                  <FaceEnrollmentView
+                    users={users}
+                    onRefresh={fetchData}
+                    darkMode={darkMode}
+                  />
+                ) : (
+                  <div className={`max-w-md mx-auto p-8 rounded-3xl border text-center space-y-4 shadow-xl transition-colors backdrop-blur-sm ${
+                    darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'
+                  }`}>
+                    <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center mx-auto shadow-inner ${
+                      darkMode ? 'bg-rose-950 text-rose-400 border-rose-800' : 'bg-rose-50 text-rose-600 border-rose-200'
+                    }`}>
+                      <Lock className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <h3 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Acceso Restringido
+                      </h3>
+                      <p className={`text-xs mt-1 leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        El módulo de enrolamiento facial requiere permisos de <strong>Administrador</strong> o <strong>Personal de Vigilancia</strong>. Actualmente tu rol es <span className="text-amber-500 font-bold uppercase">{currentUser?.role || 'Visitante'}</span>.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ═══════════════════════════════════════════════════════════════════
+                VIEW 4: PANEL DE ADMINISTRACIÓN
+                Solo para admin/security
                 ═══════════════════════════════════════════════════════════════════ */}
             {activeTab === 'admin' && (
               <div className="animate-in fade-in duration-200">
@@ -560,7 +597,6 @@ export default function App() {
         darkMode={darkMode}
       />
 
-      {/* 🖼️ Modal para cambiar foto de perfil */}
       {currentUser && (
         <AvatarModal
           isOpen={isAvatarOpen}
@@ -574,7 +610,6 @@ export default function App() {
         />
       )}
 
-      {/* 🔑 Modal para cambiar contraseña (se abre desde el navbar o desde EditProfileView) */}
       {currentUser && (
         <ChangePasswordModal
           isOpen={isChangePasswordOpen}

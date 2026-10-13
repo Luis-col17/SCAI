@@ -10,14 +10,15 @@ import {
   Moon,
   UserCog,
   KeyRound,
+  ScanFace,
 } from 'lucide-react';
 import type { UserProfile, UserRole } from '../types.ts';
 import { AVATAR_FALLBACK } from '../lib/api.ts';
 
 interface NavbarProps {
   currentUser: UserProfile | null;
-  activeTab: 'mobile' | 'camera' | 'admin';
-  setActiveTab: (tab: 'mobile' | 'camera' | 'admin') => void;
+  activeTab: 'mobile' | 'camera' | 'enrollment' | 'admin';
+  setActiveTab: (tab: 'mobile' | 'camera' | 'enrollment' | 'admin') => void;
   onOpenAuth: () => void;
   onLogout: () => void;
   darkMode: boolean;
@@ -43,7 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const logoUrl = darkMode ? '/img/logooscuro.png' : '/img/logoclaro.png';
 
   // 🔒 ¿Puede este usuario ver los módulos restringidos?
-  // Solo admin y security ven "Cámaras / Visión IA" y "Panel Admin".
+  // Solo admin y security ven "Cámaras / Visión IA", "Enrolamiento" y "Panel Admin".
   const canAccessRestrictedModules =
     !!currentUser && (currentUser.role === 'admin' || currentUser.role === 'security');
 
@@ -95,7 +96,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* 🎨 Logo SCAI Horizon + Identidad institucional */}
           <div className="flex items-center gap-3 shrink-0">
-            {/* Logo SCAI que cambia según modo claro/oscuro */}
             <img
               src={logoUrl}
               alt="SCAI Horizon"
@@ -157,6 +157,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <Camera className="w-4 h-4 text-amber-400" />
                 <span>Cámaras / Visión IA</span>
+              </button>
+            )}
+
+            {/* Tab Enrolamiento — solo admin/security con sesión */}
+            {canAccessRestrictedModules && (
+              <button
+                id="nav-tab-enrollment"
+                onClick={() => setActiveTab('enrollment')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === 'enrollment'
+                    ? darkMode ? 'bg-cyan-600 text-white shadow-sm' : 'bg-cyan-700 text-white shadow-xs'
+                    : darkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                }`}
+              >
+                <ScanFace className="w-4 h-4 text-cyan-300" />
+                <span>Enrolamiento</span>
               </button>
             )}
 
@@ -268,7 +284,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     {/* ══════ Tema (modo claro/oscuro) ══════ */}
                     <div className={`pt-2 mt-1 border-t space-y-0.5 ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
-                                            <button
+                      <button
                         onClick={() => {
                           onToggleDarkMode();
                           setShowRoleDropdown(false);
@@ -282,13 +298,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <span className="flex items-center gap-2.5">
                           {darkMode ? (
                             <>
-                              {/* Modo oscuro activo → ofrecer cambiar a claro */}
                               <Sun className="w-3.5 h-3.5 text-amber-400" />
                               <span>Cambiar a modo claro</span>
                             </>
                           ) : (
                             <>
-                              {/* Modo claro activo → ofrecer cambiar a oscuro */}
                               <Moon className="w-3.5 h-3.5 text-blue-900" />
                               <span>Cambiar a modo oscuro</span>
                             </>
@@ -337,28 +351,43 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* App Móvil — siempre visible */}
           <button
             onClick={() => setActiveTab('mobile')}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
               activeTab === 'mobile'
                 ? darkMode ? 'bg-blue-600 text-white' : 'bg-blue-900 text-white'
                 : darkMode ? 'text-slate-400' : 'text-slate-600'
             }`}
           >
             <Smartphone className="w-3.5 h-3.5" />
-            <span>App Móvil</span>
+            <span>Móvil</span>
           </button>
 
           {/* Cámara Visión — solo admin/security */}
           {canAccessRestrictedModules && (
             <button
               onClick={() => setActiveTab('camera')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
                 activeTab === 'camera'
                   ? darkMode ? 'bg-blue-600 text-white' : 'bg-blue-900 text-white'
                   : darkMode ? 'text-slate-400' : 'text-slate-600'
               }`}
             >
               <Camera className="w-3.5 h-3.5" />
-              <span>Cámara Visión</span>
+              <span>VisIón</span>
+            </button>
+          )}
+
+          {/* Enrolamiento — solo admin/security */}
+          {canAccessRestrictedModules && (
+            <button
+              onClick={() => setActiveTab('enrollment')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                activeTab === 'enrollment'
+                  ? darkMode ? 'bg-cyan-600 text-white' : 'bg-cyan-700 text-white'
+                  : darkMode ? 'text-slate-400' : 'text-slate-600'
+              }`}
+            >
+              <ScanFace className="w-3.5 h-3.5" />
+              <span>Enrolar</span>
             </button>
           )}
 
@@ -366,14 +395,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           {canAccessRestrictedModules && (
             <button
               onClick={() => setActiveTab('admin')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
                 activeTab === 'admin'
                   ? darkMode ? 'bg-blue-600 text-white' : 'bg-blue-900 text-white'
                   : darkMode ? 'text-slate-400' : 'text-slate-600'
               }`}
             >
               <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>Panel Admin</span>
+              <span>Admin</span>
             </button>
           )}
         </div>

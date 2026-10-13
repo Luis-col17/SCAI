@@ -5,7 +5,7 @@ import type { UserRole, UserStatus, AccessDirection, AccessMethod, AccessStatus 
 // 1. USUARIOS (users collection)
 // -------------------------------------------------------------
 export interface IUser {
-  businessId?: string; // id de negocio ('usr-*', usado por el frontend y las sesiones)
+  businessId?: string;
   name: string;
   email: string;
   passwordHash: string;
@@ -14,14 +14,15 @@ export interface IUser {
   facultyOrDept?: string;
   phone?: string;
   avatarUrl?: string;
-  avatarPublicId?: string; // public_id de Cloudinary (avatar, para borrado/transformaciones)
-  faceEnrolled?: boolean; // indica si el rostro está enrolado (foto(s) + embeddings disponibles)
-  faceEmbeddings?: number[][]; // una fila por captura/enrolamiento → motor ML multi-template (futuro)
+  avatarPublicId?: string;
+  faceEnrolled?: boolean;
+  faceEmbeddings?: number[][];
   enrollmentPhotos?: {
-    photoUrl: string; // secure_url de Cloudinary (captura de enrolamiento)
-    photoPublicId: string; // public_id de Cloudinary (retención/borrado)
+    photoUrl: string;
+    photoPublicId: string;
   }[];
   status: UserStatus;
+  lastEnrollmentAt?: Date;
   sessionInvalidBefore?: Date;
   createdAt?: Date;
   updatedAt?: Date;
@@ -105,6 +106,10 @@ export const UserMongoSchema = new Schema<IUser>(
       enum: ['active', 'suspended'],
       default: 'active',
       index: true,
+    },
+    lastEnrollmentAt: {
+      type: Date,
+      default: null,
     },
     sessionInvalidBefore: {
       type: Date,

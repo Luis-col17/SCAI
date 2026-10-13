@@ -19,6 +19,9 @@ type FaceService = { configured: boolean; url: string | null; reason: string | n
 interface FaceEnrollmentProps {
   userId: string;
   darkMode?: boolean;
+  /** Callback que se llama después de un enrolamiento exitoso (POST o DELETE).
+   *  Útil para refrescar listas externas (por ejemplo, la vista de admin). */
+  onEnrollmentComplete?: () => void;
   onRefresh?: () => void;
 }
 
@@ -110,7 +113,11 @@ function drawScaled(
   return canvas.toDataURL('image/jpeg', JPEG_QUALITY);
 }
 
-export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode = false, onRefresh }) => {
+export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({
+  userId,
+  darkMode = false,
+  onEnrollmentComplete,
+}) => {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [faceService, setFaceService] = useState<FaceService | null>(null);
   const [loading, setLoading] = useState(true);
@@ -282,6 +289,8 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode
         setNotice(`${data.pendingReason || 'Rostro enrolado.'} ${data.orphanedPhotos.length} foto(s) anterior(es) quedaron en el almacen externo.`);
       }
       await loadState();
+      // 🔔 Avisar al componente padre que el enrolamiento cambió
+      onEnrollmentComplete?.();
       onRefresh?.();
     } catch {
       setError('No se pudo guardar el enrolamiento');
@@ -308,6 +317,8 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({ userId, darkMode
           ? `Se eliminaron ${data.deletedPhotos} foto(s) del registro, pero ${data.orphanedPhotos.length} quedaron en el almacen externo: hay que borrarlas a mano.`
           : `Se eliminaron ${data.deletedPhotos} foto(s) y sus vectores.`
       );
+      // 🔔 Avisar al componente padre que el enrolamiento cambió
+      onEnrollmentComplete?.();
     } catch {
       setError('No se pudo eliminar el enrolamiento');
     } finally {
