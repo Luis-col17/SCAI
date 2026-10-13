@@ -31,4 +31,4 @@ Thumbs.db
 .idea/
 
 #models 
-*.onnx
+*.onnx.venv/
