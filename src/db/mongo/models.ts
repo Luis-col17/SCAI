@@ -5,6 +5,7 @@ import type { UserRole, UserStatus, AccessDirection, AccessMethod, AccessStatus 
 // 1. USUARIOS (users collection)
 // -------------------------------------------------------------
 export interface IUser {
+  businessId?: string;
   name: string;
   email: string;
   passwordHash: string;
@@ -13,12 +14,16 @@ export interface IUser {
   facultyOrDept?: string;
   phone?: string;
   avatarUrl?: string;
+  avatarPublicId?: string;
+  faceEnrolled?: boolean;
+  faceEmbeddings?: number[][];
+  enrollmentPhotos?: {
+    photoUrl: string;
+    photoPublicId: string;
+  }[];
   status: UserStatus;
-  biometricProfile?: {
-    facialEmbeddings?: number[];
-    enrolledAt?: Date;
-    photoUrl?: string;
-  };
+  lastEnrollmentAt?: Date;
+  sessionInvalidBefore?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -67,24 +72,43 @@ export const UserMongoSchema = new Schema<IUser>(
     avatarUrl: {
       type: String,
     },
-    status: {
+    avatarPublicId: {
+      type: String,
+    },
+    faceEnrolled: {
+      type: Boolean,
+      default: false,
+    },
+    faceEmbeddings: {
+      type: [[Number]], // una fila por captura/enrolamiento → motor ML multi-template (futuro)
+      default: undefined,
+    },
+    enrollmentPhotos: {
+      type: [
+        new Schema(
+          {
+            photoUrl: { type: String }, // secure_url de Cloudinary
+            photoPublicId: { type: String }, // public_id de Cloudinary (retención/borrado)
+          },
+          { _id: false }
+        ),
+      ],
+      default: undefined,
+    },
+        status: {
       type: String,
       enum: ['active', 'suspended'],
       default: 'active',
       index: true,
     },
-    biometricProfile: {
-      facialEmbeddings: {
-        type: [Number],
-        default: undefined,
-      },
-      enrolledAt: {
-        type: Date,
-        default: Date.now,
-      },
-      photoUrl: {
-        type: String,
-      },
+    lastEnrollmentAt: {
+      type: Date,
+      default: null,
+    },
+    sessionInvalidBefore: {
+      type: Date,
+      default: null,
+      index: true,
     },
   },
   {

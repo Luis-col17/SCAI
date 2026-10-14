@@ -1,20 +1,24 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+## 🎯 Cambios principales
 
-# Run and deploy your AI Studio app
+### ✨ Nuevas funcionalidades
+- **Vista de edición de perfil** (`EditProfileView.tsx`) con preview en vivo
+- **Modal de cambio de contraseña** (`ChangePasswordModal.tsx`)
+- **Endpoint** `PATCH /api/users/me` para editar datos propios
+- **Endpoint** `PATCH /api/users/me/password` para cambiar contraseña
+- **Revocación global de sesiones** al cambiar contraseña (`sessionInvalidBefore`)
 
-This contains everything you need to run your app locally.
+### 🎨 UI/UX
+- Navbar con dropdown mejorado:
+  - Editar información
+  - Cambiar contraseña
+  - Cambiar tema (claro/oscuro) ← movido del navbar al dropdown
+  - Cerrar sesión
+- Logo SCAI adaptativo (claro/oscuro)
+- Fondo ripple cyan decorativo
+- Vista web responsive (`WebAppView`)
 
-View your app in AI Studio: https://ai.studio/apps/2bdae7ca-d81d-40e7-b31f-bfcc354facac
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 🔒 Seguridad
+- Validación de política de contraseñas reutilizable
+- Revocación de tokens al cambiar contraseña (fuerza re-login global)
+- Validación de `sessionInvalidBefore` en `authenticateToken`
+- Validación de campos editables (`name`, `phone`, `facultyOrDept`)

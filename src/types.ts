@@ -13,13 +13,15 @@ export interface UserProfile {
   name: string;
   email: string;
   role: UserRole;
-  documentId: string; // Cédula o carné institucional
+  documentId: string;
   facultyOrDept?: string;
   phone?: string;
   avatarUrl?: string;
+  avatarPublicId?: string;
   status: UserStatus;
   faceEnrolled?: boolean;
-  facePhotoUrl?: string;
+  /** Fecha del último enrolamiento facial (se actualiza al POST exitoso). */
+  lastEnrollmentAt?: string;
   createdAt: string;
   updatedAt?: string;
 }
