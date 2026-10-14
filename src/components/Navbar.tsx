@@ -11,7 +11,6 @@ import {
   Moon
 } from 'lucide-react';
 import type { UserProfile, UserRole } from '../types.ts';
-import { AVATAR_FALLBACK } from '../lib/api.ts';
 
 interface NavbarProps {
   currentUser: UserProfile | null;
@@ -19,6 +18,7 @@ interface NavbarProps {
   setActiveTab: (tab: 'mobile' | 'camera' | 'admin') => void;
   onOpenAuth: () => void;
   onLogout: () => void;
+  onQuickSwitchUser: (role: UserRole) => void;
   darkMode: boolean;
   onToggleDarkMode: () => void;
 }
@@ -29,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   onOpenAuth,
   onLogout,
+  onQuickSwitchUser,
   darkMode,
   onToggleDarkMode,
 }) => {
@@ -196,7 +197,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   <img
-                    src={currentUser.avatarUrl || AVATAR_FALLBACK}
+                    src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
                     alt={currentUser.name}
                     className="w-7 h-7 rounded-lg object-cover ring-2 ring-blue-900"
                     referrerPolicy="no-referrer"
@@ -229,6 +230,64 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <p className="font-bold truncate">{currentUser.name}</p>
                       <p className={`text-[11px] truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{currentUser.email}</p>
                       <p className="text-[10px] text-amber-500 font-mono font-semibold mt-1">C.C./Carné: {currentUser.documentId}</p>
+                    </div>
+
+                    <div className="py-2">
+                      <p className="px-3 text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
+                        Cambio Rápido de Rol (Demo)
+                      </p>
+                      <button
+                        onClick={() => { onQuickSwitchUser('admin'); setShowRoleDropdown(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors ${
+                          currentUser.role === 'admin' 
+                            ? 'bg-blue-900 text-white font-bold' 
+                            : darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span>Ing. Carlos (Admin)</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                          darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
+                        }`}>admin</span>
+                      </button>
+                      <button
+                        onClick={() => { onQuickSwitchUser('security'); setShowRoleDropdown(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors ${
+                          currentUser.role === 'security' 
+                            ? 'bg-blue-900 text-white font-bold' 
+                            : darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span>Oficial Jairo (Vigilancia)</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                          darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
+                        }`}>seguridad</span>
+                      </button>
+                      <button
+                        onClick={() => { onQuickSwitchUser('student'); setShowRoleDropdown(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors ${
+                          currentUser.role === 'student' 
+                            ? 'bg-blue-900 text-white font-bold' 
+                            : darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span>Dilan González (Estudiante)</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                          darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
+                        }`}>estudiante</span>
+                      </button>
+                      <button
+                        onClick={() => { onQuickSwitchUser('teacher'); setShowRoleDropdown(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors ${
+                          currentUser.role === 'teacher' 
+                            ? 'bg-blue-900 text-white font-bold' 
+                            : darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span>Dra. María Ospina (Docente)</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                          darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
+                        }`}>docente</span>
+                      </button>
                     </div>
 
                     <div className={`pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>

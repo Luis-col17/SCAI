@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Camera, 
   User, 
@@ -19,7 +19,6 @@ import {
   Check
 } from 'lucide-react';
 import type { UserProfile, AccessLog, AccessDirection } from '../types.ts';
-import { getStoredToken, AVATAR_FALLBACK } from '../lib/api.ts';
 
 interface RecognitionModuleProps {
   users: UserProfile[];
@@ -40,12 +39,6 @@ export const RecognitionCameraModule: React.FC<RecognitionModuleProps> = ({
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [turnstileOpen, setTurnstileOpen] = useState(false);
 
-  // La estación de cámara es una zona de vigilancia: sus rutas exigen rol admin/security.
-const authHeaders = (): Record<string, string> => {
-  const token = getStoredToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
   // Result states
   const [lastResult, setLastResult] = useState<{
     authorized: boolean;
@@ -64,7 +57,7 @@ const authHeaders = (): Record<string, string> => {
   } | null>(null);
 
   // Simulated target persona selector for vision testing
-  const [simulatedPersonId, setSimulatedPersonId] = useState<string>('unknown'); // sin persona → rostro no registrado
+  const [simulatedPersonId, setSimulatedPersonId] = useState<string>('usr-std-01'); // default Dilan
   const [showContingencyModal, setShowContingencyModal] = useState(false);
 
   // Contingency form state (RF-11)
@@ -284,7 +277,7 @@ const authHeaders = (): Record<string, string> => {
 
       const res = await fetch('/api/recognition/verify-face', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           matchedUserId,
           direction,
@@ -355,7 +348,7 @@ const authHeaders = (): Record<string, string> => {
     try {
       const res = await fetch('/api/recognition/manual-access', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           direction,
           entryPoint,
@@ -753,7 +746,7 @@ const authHeaders = (): Record<string, string> => {
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <img
-                        src={u.avatarUrl || AVATAR_FALLBACK}
+                        src={u.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
                         alt={u.name}
                         className="w-10 h-10 rounded-full object-cover border-2 border-slate-400 shrink-0"
                       />
@@ -762,6 +755,11 @@ const authHeaders = (): Record<string, string> => {
                           <h4 className={`text-xs font-bold truncate ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
                             {u.name}
                           </h4>
+                          {u.id === 'usr-std-01' && (
+                            <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/40 px-1.5 rounded font-black">
+                              Dilan
+                            </span>
+                          )}
                         </div>
                         <p className={`text-[11px] font-mono font-semibold ${darkMode ? 'text-amber-400' : 'text-blue-950'}`}>
                           CC: {u.documentId} • {u.role}

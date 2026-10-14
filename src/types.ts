@@ -17,9 +17,9 @@ export interface UserProfile {
   facultyOrDept?: string;
   phone?: string;
   avatarUrl?: string;
-  avatarPublicId?: string; // public_id de Cloudinary del avatar
   status: UserStatus;
   faceEnrolled?: boolean;
+  facePhotoUrl?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -28,7 +28,6 @@ export interface AccessLog {
   id: string;
   direction: AccessDirection; // 'entry' (Entrada) | 'exit' (Salida)
   entryPoint: string; // e.g. "Torniquetes Entrada Cra 5", "Torniquetes Salida Cra 5"
-  entryPointId?: string; // code del torniquete (entry_points.code)
   method: AccessMethod;
   status: AccessStatus;
   userId?: string;
@@ -38,7 +37,6 @@ export interface AccessLog {
   confidenceScore: number; // e.g. 0.98 (98%)
   notes?: string;
   snapshotUrl?: string;
-  snapshotPublicId?: string; // public_id de Cloudinary de la captura
   timestamp: string;
 }
 

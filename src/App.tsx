@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar.tsx';
 import { AuthModal } from './components/AuthModal.tsx';
 import { MobileAppView } from './components/MobileAppView.tsx';
 import { RecognitionCameraModule } from './components/RecognitionCameraModule.tsx';
 import { AdminDashboard } from './components/AdminDashboard.tsx';
 import { TechnicalInfoModal } from './components/TechnicalInfoModal.tsx';
-import { storeToken, clearStoredToken } from './lib/api.ts';
-import type { UserProfile, AccessLog, SystemStats } from './types.ts';
-import { authFetch } from './lib/api.ts';
-import { Shield, Lock, Smartphone, Camera, LayoutDashboard, Sparkles } from 'lucide-react';
+import type { UserProfile, AccessLog, SystemStats, UserRole } from './types.ts';
+import { Shield, Lock, Smartphone, Camera, LayoutDashboard, ArrowRight, Sparkles } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -26,31 +24,23 @@ export default function App() {
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Persistencia de sesión: el usuario autenticado se conserva al recargar la página.
-  const SESSION_KEY = 'uniminuto_session';
-  const restoredRef = useRef(false);
-
   // Load all system data
   const fetchData = async () => {
     try {
       const [usersRes, logsRes, statsRes] = await Promise.all([
-        authFetch('/api/users'),
-        authFetch('/api/access-logs'),
-        authFetch('/api/stats'),
+        fetch('/api/users'),
+        fetch('/api/access-logs'),
+        fetch('/api/stats'),
       ]);
-
-      // Las rutas requieren sesión: si el token expiró o fue revocado, se limpia.
-      if ((usersRes.status === 401 || usersRes.status === 403) && authToken) {
-        clearStoredToken();
-        localStorage.removeItem(SESSION_KEY);
-        setCurrentUser(null);
-        setAuthToken(null);
-        return;
-      }
 
       if (usersRes.ok) {
         const u = await usersRes.json();
         setUsers(u);
+        // Default set Dilan as the initial active user if none set
+        if (!currentUser) {
+          const dilan = u.find((item: UserProfile) => item.id === 'usr-std-01') || u[0];
+          setCurrentUser(dilan);
+        }
       }
       if (logsRes.ok) {
         setLogs(await logsRes.json());
@@ -65,97 +55,37 @@ export default function App() {
     }
   };
 
-  // Restore persisted session (token + user) so a reload keeps the logged-in person
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (saved.token && saved.user) {
-          restoredRef.current = true;
-          // authFetch() lee 'accessToken': sin esto, el resto de la app
-          // consultaría la API sin cabecera Authorization y recibiría 401.
-          storeToken(saved.token);
-          setAuthToken(saved.token);
-          setCurrentUser(saved.user);
-          // Refresh the profile from the server (avoids stale role/name)
-          fetch('/api/auth/me', {
-            headers: { Authorization: `Bearer ${saved.token}` },
-          })
-            .then(async (r) => {
-              if (r.ok) return r.json();
-              // Token expirado o revocado: la sesión ya no vale
-              if (r.status === 401 || r.status === 403) {
-                clearStoredToken();
-                localStorage.removeItem(SESSION_KEY);
-                setAuthToken(null);
-                setCurrentUser(null);
-              }
-              return null;
-            })
-            .then((fresh) => {
-              if (fresh) {
-                setCurrentUser(fresh);
-                localStorage.setItem(
-                  SESSION_KEY,
-                  JSON.stringify({ user: fresh, token: saved.token })
-                );
-              }
-            })
-            .catch(() => {});
-        }
-      }
-    } catch {
-      clearStoredToken();
-      localStorage.removeItem(SESSION_KEY);
-    }
-  }, []);
-
-  // Se recarga al cambiar la sesión: sin token no hay datos que traer.
   useEffect(() => {
     fetchData();
-  }, [authToken]);
+  }, []);
+
+  // Quick switch user role for testing
+  const handleQuickSwitchUser = (targetRole: UserRole) => {
+    const matched = users.find((u) => u.role === targetRole);
+    if (matched) {
+      setCurrentUser(matched);
+    }
+  };
 
   // Login success
   const handleLoginSuccess = (user: UserProfile, token: string) => {
-    restoredRef.current = true;
     setCurrentUser(user);
     setAuthToken(token);
-    storeToken(token);
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ user, token }));
+    fetchData();
   };
 
   const handleLogout = () => {
-    restoredRef.current = false;
     setCurrentUser(null);
     setAuthToken(null);
-    clearStoredToken();
-    localStorage.removeItem(SESSION_KEY);
-  };
-
-  // Keeps the session (and Navbar) in sync when the person edits their own profile
-  const handleUserUpdated = (user: UserProfile) => {
-    setCurrentUser(user);
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      const saved = raw ? JSON.parse(raw) : null;
-      if (saved?.token) {
-        localStorage.setItem(SESSION_KEY, JSON.stringify({ user, token: saved.token }));
-      }
-    } catch {
-      // ignore persistence errors
-    }
   };
 
   // Called whenever the vision camera logs a new entry or exit
   const handleNewAccessLog = (newLog: AccessLog) => {
     setLogs((prev) => [newLog, ...prev]);
     // Refresh stats
-    authFetch('/api/stats')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d) setStats(d);
-      })
+    fetch('/api/stats')
+      .then((r) => r.json())
+      .then((d) => setStats(d))
       .catch(() => {});
   };
 
@@ -171,6 +101,7 @@ export default function App() {
         setActiveTab={setActiveTab}
         onOpenAuth={() => setIsAuthOpen(true)}
         onLogout={handleLogout}
+        onQuickSwitchUser={handleQuickSwitchUser}
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode((prev) => !prev)}
       />
@@ -208,7 +139,6 @@ export default function App() {
                     <MobileAppView
                       currentUser={currentUser}
                       onRefresh={fetchData}
-                      onUserUpdated={handleUserUpdated}
                       darkMode={darkMode}
                     />
                   </div>
@@ -267,28 +197,11 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* La estación de cámara es zona de vigilancia: el servidor exige rol admin/security */}
-                {currentUser && (currentUser.role === 'admin' || currentUser.role === 'security') ? (
                 <RecognitionCameraModule
                   users={users}
                   onNewAccessLog={handleNewAccessLog}
                   darkMode={darkMode}
                 />
-                ) : (
-                  <div className={`p-10 rounded-2xl border text-center ${
-                    darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
-                  }`}>
-                    <Lock className={`w-10 h-10 mx-auto mb-3 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
-                    <h3 className={`text-sm font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      Estación de vigilancia restringida
-                    </h3>
-                    <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {currentUser
-                        ? 'Tu rol no tiene permiso para operar la cámara de reconocimiento facial.'
-                        : 'Inicia sesión con una cuenta de vigilancia o administración para operar este módulo.'}
-                    </p>
-                  </div>
-                )}
               </div>
             )}
 
@@ -322,6 +235,21 @@ export default function App() {
                         Este panel requiere permisos de <strong>Administrador</strong> o <strong>Personal de Vigilancia</strong>. Actualmente tu rol es <span className="text-amber-500 font-bold uppercase">{currentUser?.role || 'Visitante'}</span>.
                       </p>
                     </div>
+
+                    <div className={`p-3.5 rounded-2xl border text-left text-xs space-y-2 ${
+                      darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <span className={`font-bold block text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-700'}`}>
+                        Para evaluar el panel administrativo como evaluador del proyecto:
+                      </span>
+                      <button
+                        onClick={() => handleQuickSwitchUser('admin')}
+                        className="w-full py-2.5 px-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
+                      >
+                        <span>Cambiar a Rol Administrador (Carlos)</span>
+                        <ArrowRight className="w-4 h-4 text-amber-400" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -340,7 +268,7 @@ export default function App() {
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <span className={`text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Control de Acceso Peatonal • Cámaras–Visión IA
+              Proyecto de Investigación: <strong className={darkMode ? 'text-amber-400' : 'text-slate-800'}>Dilan</strong> • Ing. de Sistemas
             </span>
             <button
               onClick={() => setIsTechInfoOpen(true)}

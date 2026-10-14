@@ -5,7 +5,8 @@ import {
   Mail, 
   User, 
   AlertCircle,
-  KeyRound
+  KeyRound,
+  Sparkles
 } from 'lucide-react';
 import type { UserRole, UserProfile } from '../types.ts';
 
@@ -36,6 +37,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [phone, setPhone] = useState('');
 
   if (!isOpen) return null;
+
+  const handleQuickLogin = (demoEmail: string, demoPass: string) => {
+    setEmail(demoEmail);
+    setPassword(demoPass);
+    setError(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,6 +147,62 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         </div>
 
+        {/* Quick Demo Fillers (Only on login) */}
+        {mode === 'login' && (
+          <div className={`mb-5 p-3 rounded-2xl border ${
+            darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className={`flex items-center gap-1.5 text-[11px] font-bold mb-2 ${
+              darkMode ? 'text-slate-300' : 'text-slate-700'
+            }`}>
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Cuentas de Demostración:</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('admin@uniminuto.edu.co', 'admin123')}
+                className={`p-2 rounded-xl border text-left transition-colors shadow-2xs ${
+                  darkMode ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200' : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-800'
+                }`}
+              >
+                <div className={`font-bold ${darkMode ? 'text-white' : 'text-blue-950'}`}>Admin TI</div>
+                <div className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>admin@uniminuto...</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('seguridad@uniminuto.edu.co', 'seguridad123')}
+                className={`p-2 rounded-xl border text-left transition-colors shadow-2xs ${
+                  darkMode ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200' : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-800'
+                }`}
+              >
+                <div className={`font-bold ${darkMode ? 'text-white' : 'text-blue-950'}`}>Vigilancia</div>
+                <div className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>seguridad@uniminuto...</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('dilan.estudiante@uniminuto.edu.co', 'dilan123')}
+                className={`p-2 rounded-xl border text-left transition-colors shadow-2xs ${
+                  darkMode ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200' : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-800'
+                }`}
+              >
+                <div className="font-bold text-amber-500">Dilan (Estudiante)</div>
+                <div className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>dilan.estudiante...</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('maria.ospina@uniminuto.edu.co', 'docente123')}
+                className={`p-2 rounded-xl border text-left transition-colors shadow-2xs ${
+                  darkMode ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200' : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-800'
+                }`}
+              >
+                <div className="font-bold text-purple-400">Dra. Ospina (Docente)</div>
+                <div className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>maria.ospina...</div>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Error notification */}
         {error && (
           <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-300 flex items-start gap-2.5 text-xs text-rose-800 font-medium">
@@ -161,7 +224,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Nombre completo"
+                    placeholder="Ej. Dilan González"
                     className={`w-full pl-9 pr-3 py-2 border rounded-xl text-xs focus:outline-hidden ${
                       darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-blue-500' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-900'
                     }`}

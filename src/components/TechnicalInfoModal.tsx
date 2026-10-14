@@ -72,6 +72,9 @@ export const TechnicalInfoModal: React.FC<TechnicalInfoModalProps> = ({
             <p className="font-medium">
               <strong>Título:</strong> "Aplicación móvil con visión artificial para el control y gestión del acceso peatonal por reconocimiento facial en la Corporación Universitaria Minuto de Dios – Sede Ibagué."
             </p>
+            <p className={`mt-1 text-[11px] font-bold ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
+              Desarrollador: <strong>Dilan</strong> • VI Semestre de Ingeniería de Sistemas.
+            </p>
           </div>
 
           {/* Core Stack */}
@@ -84,7 +87,7 @@ export const TechnicalInfoModal: React.FC<TechnicalInfoModalProps> = ({
                 <span>MongoDB & Mongoose</span>
               </div>
               <p className={`text-[11px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Colecciones NoSQL: <code className="text-amber-400 font-mono font-bold">users</code>, <code className="text-amber-400 font-mono font-bold">access_logs</code>, <code className="text-amber-400 font-mono font-bold">entry_points</code>, <code className="text-amber-400 font-mono font-bold">revoked_tokens</code> (TTL) validadas con esquemas <code className="font-mono text-emerald-400">Mongoose</code>.
+                Colecciones NoSQL: <code className="text-amber-400 font-mono font-bold">users</code>, <code className="text-amber-400 font-mono font-bold">access_logs</code>, <code className="text-amber-400 font-mono font-bold">entry_points</code>, <code className="text-amber-400 font-mono font-bold">sessions</code> (TTL) con validación nativa <code className="font-mono text-emerald-400">$jsonSchema</code>.
               </p>
             </div>
 
@@ -93,10 +96,10 @@ export const TechnicalInfoModal: React.FC<TechnicalInfoModalProps> = ({
             }`}>
               <div className="flex items-center gap-2 text-blue-400 font-black mb-1.5">
                 <Database className="w-4 h-4 text-blue-400" />
-                <span>Node.js, Express & TypeScript</span>
+                <span>PostgreSQL & Drizzle</span>
               </div>
               <p className={`text-[11px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                API REST en <code className="text-blue-400 font-mono font-bold">server.ts</code> con Express y TypeScript, validación de datos entrantes y almacenamiento de imágenes en Cloudinary.
+                Esquema relacional en <code className="text-blue-400 font-mono font-bold">src/db/schema.ts</code> listo para Neon Postgres y Cloud SQL con soporte de migraciones.
               </p>
             </div>
 
@@ -105,44 +108,55 @@ export const TechnicalInfoModal: React.FC<TechnicalInfoModalProps> = ({
             }`}>
               <div className="flex items-center gap-2 text-amber-400 font-black mb-1.5">
                 <Key className="w-4 h-4 text-amber-400" />
-                <span>JWT, scrypt & RBAC</span>
+                <span>Better Auth & RBAC</span>
               </div>
               <p className={`text-[11px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Contraseñas con <code className="font-mono">scrypt</code>, sesión por token JWT (1 día, revocable) y roles: Administrador, Personal de Vigilancia, Estudiante, Docente y Visitante.
+                Autenticación y sesiones seguras por token con roles: Administrador, Personal de Vigilancia, Estudiante, Docente y Visitante.
               </p>
             </div>
           </div>
 
-          {/* Mongoose Schema snippet */}
+          {/* Drizzle Schema snippet */}
           <div className={`p-3.5 rounded-2xl border space-y-2 ${
             darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
           }`}>
             <div className="flex items-center justify-between">
               <span className={`font-mono text-[11px] font-bold ${darkMode ? 'text-amber-400' : 'text-blue-950'}`}>
-                Esquema Mongoose de Usuario (Peatonal & Facial)
+                Esquema Drizzle PostgreSQL (Peatonal & Facial)
               </span>
-              <span className="text-[10px] text-slate-500 font-mono">TypeScript / MongoDB</span>
+              <span className="text-[10px] text-slate-500 font-mono">TypeScript / SQL</span>
             </div>
             <pre className={`p-3 rounded-xl font-mono text-[10.5px] overflow-x-auto border leading-relaxed ${
               darkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-800'
             }`}>
-{`// src/db/mongo/models.ts
-export const UserMongoSchema = new Schema<IUser>({
-  businessId: { type: String, unique: true, sparse: true, index: true },
-  name:       { type: String, required: true, trim: true },
-  email:      { type: String, required: true, unique: true, lowercase: true },
-  passwordHash: { type: String, required: true },        // scrypt
-  role:       { type: String, enum: ['admin', 'security',
-                'student', 'teacher', 'staff', 'visitor'], default: 'student' },
-  documentId: { type: String, required: true, unique: true },
-  avatarUrl:      { type: String },                      // Cloudinary
-  avatarPublicId: { type: String },
-  faceEnrolled:   { type: Boolean, default: false },
-  faceEmbeddings: { type: [[Number]], default: undefined }, // motor ML (futuro)
-  enrollmentPhotos: [{ photoUrl: String, photoPublicId: String }],
-  status:     { type: String, enum: ['active', 'blocked', 'inactive'],
-                default: 'active' },
-}, { timestamps: true, collection: 'users' });`}
+{`// src/db/schema.ts
+export const usersTable = pgTable('users', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  role: varchar('role', { length: 32 }).notNull().default('student'),
+  documentId: varchar('document_id', { length: 64 }).notNull().unique(),
+  status: varchar('status', { length: 32 }).notNull().default('active'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const entryPointsTable = pgTable('entry_points', {
+  id: text('id').primaryKey(),
+  code: varchar('code', { length: 32 }).notNull().unique(), // 'IBG-P-01'
+  name: text('name').notNull(), // 'Torniquetes Entrada Cra 5'
+  gateType: varchar('gate_type', { length: 32 }).notNull().default('pedestrian'),
+  cameraUrl: text('camera_url'),
+  barrierControllerIp: varchar('barrier_controller_ip', { length: 64 }),
+});
+
+export const accessLogsTable = pgTable('access_logs', {
+  id: text('id').primaryKey(),
+  direction: varchar('direction', { length: 16 }).notNull().default('entry'), // 'entry' | 'exit'
+  entryPoint: text('entry_point').notNull(),
+  method: varchar('method', { length: 64 }).notNull(), // 'facial_recognition'
+  status: varchar('status', { length: 32 }).notNull(), // 'authorized' | 'denied'
+  confidenceScore: real('confidence_score').notNull(),
+});`}
             </pre>
           </div>
 

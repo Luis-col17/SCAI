@@ -1,0 +1,6 @@
+{
+  "name": "Sistema de Control de Acceso - Uniminuto Sede Ibagué",
+  "description": "Sistema de control y gestión de acceso peatonal y vehicular con visión artificial, gestión de vehículos, roles y panel de administración.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

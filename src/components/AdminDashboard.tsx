@@ -21,7 +21,6 @@ import {
   Camera
 } from 'lucide-react';
 import type { UserProfile, AccessLog, SystemStats, UserRole, UserStatus } from '../types.ts';
-import { authFetch, AVATAR_FALLBACK } from '../lib/api.ts';
 
 interface AdminDashboardProps {
   users: UserProfile[];
@@ -64,7 +63,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleToggleUserStatus = async (user: UserProfile) => {
     try {
       const newStatus: UserStatus = user.status === 'active' ? 'suspended' : 'active';
-      const res = await authFetch(`/api/users/${user.id}/status`, {
+      const res = await fetch(`/api/users/${user.id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -83,34 +82,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
     try {
-      const res = await authFetch(`/api/users/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
       if (res.ok) {
         onRefresh();
       }
     } catch (err) {
       console.error('Error deleting user', err);
-    }
-  };
-
-  // Descarga del CSV: requiere cabecera Authorization, así que no sirve un <a href>.
-  const handleExportCsv = async () => {
-    try {
-      const res = await authFetch('/api/access-logs/export');
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'No se pudo generar el reporte');
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'uniminuto_accesos_peatonales.csv';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setCreateError(err.message || 'No se pudo generar el reporte');
     }
   };
 
@@ -120,7 +97,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setCreateLoading(true);
     setCreateError(null);
     try {
-      const res = await authFetch('/api/users', {
+      const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -130,6 +107,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           role: newUserRole,
           documentId: newUserDoc,
           facultyOrDept: newUserFaculty,
+          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+          faceEnrolled: true,
         }),
       });
 
@@ -626,7 +605,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <td className="p-4">
                           <div className="flex items-center gap-3">
                             <img
-                              src={u.avatarUrl || AVATAR_FALLBACK}
+                              src={u.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
                               alt={u.name}
                               className="w-9 h-9 rounded-full object-cover border border-slate-400 shrink-0"
                             />
@@ -777,9 +756,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </select>
             </div>
 
-            <button
-              type="button"
-              onClick={handleExportCsv}
+            <a
+              href="/api/access-logs/export"
+              download="uniminuto_accesos_peatonales.csv"
               className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 border transition-colors shrink-0 w-full sm:w-auto justify-center ${
                 darkMode 
                   ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700' 
@@ -788,7 +767,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             >
               <Download className="w-4 h-4 text-blue-500" />
               <span>Exportar Reporte CSV</span>
-            </button>
+            </a>
           </div>
 
           {/* Logs Table */}

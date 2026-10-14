@@ -43,10 +43,6 @@ export function getMongoConnectionStatus(): MongoStatus {
 
 /**
  * Conecta a MongoDB utilizando la variable de entorno MONGODB_URI
- *
- * El plan gratuito de Atlas pausa el clúster tras 7 días sin uso y al primer
- * arranque tarda más de 5 s en aceptar conexiones. Con un solo intento la app
- * caía al store en memoria y parecía una base vacía, así que se reintenta.
  */
 export async function connectToMongoDB(customUri?: string): Promise<boolean> {
   const uri = customUri || process.env.MONGODB_URI;
@@ -66,38 +62,17 @@ export async function connectToMongoDB(customUri?: string): Promise<boolean> {
 
   isConnecting = true;
 
-  const attempts = [
-    { timeoutMS: 12000, waitBefore: 0 },
-    { timeoutMS: 20000, waitBefore: 3000 },
-  ];
-  let lastError = '';
-
   try {
-    for (const [index, attempt] of attempts.entries()) {
-      if (attempt.waitBefore) {
-        await new Promise(resolve => setTimeout(resolve, attempt.waitBefore));
-      }
-      try {
-        console.log(
-          `[MongoDB] Conectando a Uniminuto (intento ${index + 1}/${attempts.length}, espera ${attempt.timeoutMS} ms)...`
-        );
-        await mongoose.connect(uri, {
-          serverSelectionTimeoutMS: attempt.timeoutMS,
-          dbName: 'uniminuto_acceso',
-        });
+    console.log('[MongoDB] Intentando conectar a la base de datos Uniminuto...');
+    await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 5000,
+      dbName: 'uniminuto_acceso',
+    });
 
-        console.log(`[MongoDB] ¡Conexión exitosa a MongoDB! Base de datos: ${mongoose.connection.name}`);
-        return true;
-      } catch (err: any) {
-        lastError = err?.message || String(err);
-        console.warn(`[MongoDB] Intento ${index + 1} fallido: ${lastError}`);
-      }
-    }
-
-    console.warn('[MongoDB] Conexión no disponible. La app queda en MODO MEMORIA:');
-    console.warn('[MongoDB] los datos de esta sesión NO se guardan y se pierden al reiniciar.');
-    console.warn('[MongoDB] Revisa la red, la lista de acceso IP en Atlas o usa "Reintentar conexión" en el panel.');
-    void lastError;
+    console.log(`[MongoDB] ¡Conexión exitosa a MongoDB! Base de datos: ${mongoose.connection.name}`);
+    return true;
+  } catch (err: any) {
+    console.warn('[MongoDB] Aviso de conexión:', err?.message || err);
     return false;
   } finally {
     isConnecting = false;

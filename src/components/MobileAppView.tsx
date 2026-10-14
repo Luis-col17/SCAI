@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   IdCard, 
   History, 
@@ -12,26 +12,19 @@ import {
   Check,
   Clock,
   Wifi,
-  Battery,
-  Upload,
-  Trash2
+  Battery
 } from 'lucide-react';
 import type { UserProfile, AccessLog } from '../types.ts';
-import { getStoredToken, AVATAR_FALLBACK } from '../lib/api.ts';
-import { FaceEnrollment } from './FaceEnrollment.tsx';
-import { AvatarModal } from './AvatarModal.tsx';
 
 interface MobileAppViewProps {
   currentUser: UserProfile;
   onRefresh: () => void;
-  onUserUpdated?: (user: UserProfile) => void;
   darkMode?: boolean;
 }
 
 export const MobileAppView: React.FC<MobileAppViewProps> = ({
   currentUser,
   onRefresh,
-  onUserUpdated,
   darkMode = false,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'id_card' | 'history'>('id_card');
@@ -39,54 +32,11 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [filterDirection, setFilterDirection] = useState<'all' | 'entry' | 'exit'>('all');
 
-  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(currentUser.avatarUrl);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [avatarError, setAvatarError] = useState<string | null>(null);
-  const [avatarNotice, setAvatarNotice] = useState<string | null>(null);
-  const [showAvatarModal, setShowAvatarModal] = useState(false);
-
-  useEffect(() => {
-    setAvatarUrl(currentUser.avatarUrl);
-  }, [currentUser.id, currentUser.avatarUrl]);
-
-  const authHeaders = (): Record<string, string> => {
-  const token = getStoredToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
-  const handleAvatarRemoved = async () => {
-    setAvatarError(null);
-    setAvatarNotice(null);
-    setAvatarUploading(true);
-    try {
-      const response = await fetch(`/api/users/${currentUser.id}/avatar`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-      });
-      const payload = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(payload?.error || 'No se pudo quitar la foto de perfil');
-      }
-
-      setAvatarUrl(undefined);
-      onUserUpdated?.(payload.user);
-      onRefresh();
-      setAvatarNotice('Foto de perfil quitada.');
-    } catch (err: any) {
-      setAvatarError(err.message || 'Error al quitar la foto de perfil');
-    } finally {
-      setAvatarUploading(false);
-    }
-  };
-
   // Load user access logs
   const loadUserData = async () => {
     setLoading(true);
     try {
-      const logsRes = await fetch(`/api/access-logs?userId=${currentUser.id}`, {
-      headers: authHeaders(),
-    });
+      const logsRes = await fetch(`/api/access-logs?userId=${currentUser.id}`);
       if (logsRes.ok) {
         setLogs(await logsRes.json());
       }
@@ -273,28 +223,13 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
 
                 {/* User Body with Photo & Info */}
                 <div className="flex gap-3.5 items-center">
-                  <div className="relative shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowAvatarModal(true)}
-                      disabled={avatarUploading}
-                      title="Cambiar foto de perfil"
-                      className={`relative block w-20 h-24 rounded-xl overflow-hidden border-2 border-blue-900 shadow-sm transition-all ${
-                        avatarUploading ? 'opacity-60 cursor-wait' : 'cursor-pointer hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-amber-500'
-                      }`}
-                    >
-                      <img
-                        src={avatarUrl || AVATAR_FALLBACK}
-                        alt={currentUser.name}
-                        className="w-full h-full object-cover"
-                      />
-                      {avatarUploading && (
-                        <span className="absolute inset-0 flex items-center justify-center bg-slate-900/55">
-                          <RefreshCw className="w-5 h-5 text-amber-400 animate-spin" />
-                        </span>
-                      )}
-                    </button>
-                    <div className="absolute -bottom-1.5 -right-1.5 bg-amber-500 text-blue-950 rounded-full p-1 border border-white shadow-xs pointer-events-none">
+                  <div className="relative">
+                    <img
+                      src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                      alt={currentUser.name}
+                      className="w-20 h-24 rounded-xl object-cover border-2 border-blue-900 shadow-sm"
+                    />
+                    <div className="absolute -bottom-1.5 -right-1.5 bg-amber-500 text-blue-950 rounded-full p-1 border border-white shadow-xs">
                       <Camera className="w-3 h-3" />
                     </div>
                   </div>
@@ -331,75 +266,6 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                     </div>
                   </div>
                 </div>
-
-                {/* Configuración de la foto de perfil */}
-                <div className={`pt-3 border-t space-y-2 ${
-                  darkMode ? 'border-slate-800' : 'border-slate-200'
-                }`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className={`text-[9px] font-black uppercase tracking-wider ${
-                        darkMode ? 'text-slate-400' : 'text-slate-500'
-                      }`}>
-                        Foto de perfil
-                      </p>
-                      <p className={`text-[9px] leading-tight ${
-                        darkMode ? 'text-slate-500' : 'text-slate-500'
-                      }`}>
-                        Toca tu foto para actualizarla (JPG, PNG o WEBP, máx. 5 MB)
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setShowAvatarModal(true)}
-                        disabled={avatarUploading}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wide border transition-colors disabled:opacity-50 ${
-                          darkMode
-                            ? 'bg-amber-950 text-amber-300 border-amber-800 hover:bg-amber-900'
-                            : 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
-                        }`}
-                      >
-                        <Upload className="w-3 h-3" />
-                        {avatarUrl ? 'Cambiar' : 'Subir'}
-                      </button>
-                      {avatarUrl && (
-                        <button
-                          type="button"
-                          onClick={handleAvatarRemoved}
-                          disabled={avatarUploading}
-                          title="Quitar foto de perfil"
-                          className={`p-1.5 rounded-lg border transition-colors disabled:opacity-50 ${
-                            darkMode
-                              ? 'bg-rose-950 text-rose-300 border-rose-800 hover:bg-rose-900'
-                              : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'
-                          }`}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {avatarNotice && (
-                    <p className={`flex items-center gap-1 text-[9px] font-semibold ${
-                      darkMode ? 'text-emerald-400' : 'text-emerald-700'
-                    }`}>
-                      <Check className="w-3 h-3" />
-                      {avatarNotice}
-                    </p>
-                  )}
-                  {avatarError && (
-                    <p className={`text-[9px] font-semibold ${
-                      darkMode ? 'text-rose-400' : 'text-rose-600'
-                    }`}>
-                      {avatarError}
-                    </p>
-                  )}
-                </div>
-
-                {/* Enrolamiento facial del propio usuario */}
-                <FaceEnrollment userId={currentUser.id} darkMode={darkMode} />
 
                 {/* Barcode / QR Simulation for Torniquete Contingency */}
                 <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
@@ -641,17 +507,6 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
             <span>Torniquetes</span>
           </button>
         </div>
-
-        <AvatarModal
-          isOpen={showAvatarModal}
-          onClose={() => setShowAvatarModal(false)}
-          darkMode={darkMode}
-          userId={currentUser.id}
-          userName={currentUser.name}
-          currentAvatarUrl={avatarUrl}
-          onUserUpdated={onUserUpdated}
-          onRefresh={onRefresh}
-        />
 
       </div>
     </div>
