@@ -1,18 +1,16 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { 
-  IdCard, 
-  History, 
-  CheckCircle2, 
-  QrCode, 
-  Sparkles, 
-  RefreshCw, 
-  LogIn, 
-  LogOut, 
-  Camera, 
+import {
+  IdCard,
+  History,
+  CheckCircle2,
+  QrCode,
+  Sparkles,
+  RefreshCw,
+  LogIn,
+  LogOut,
+  Camera,
   Check,
   Clock,
-  Wifi,
-  Battery,
   Upload,
   Trash2
 } from 'lucide-react';
@@ -50,9 +48,9 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
   }, [currentUser.id, currentUser.avatarUrl]);
 
   const authHeaders = (): Record<string, string> => {
-  const token = getStoredToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+    const token = getStoredToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
 
   const handleAvatarRemoved = async () => {
     setAvatarError(null);
@@ -85,8 +83,8 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
     setLoading(true);
     try {
       const logsRes = await fetch(`/api/access-logs?userId=${currentUser.id}`, {
-      headers: authHeaders(),
-    });
+        headers: authHeaders(),
+      });
       if (logsRes.ok) {
         setLogs(await logsRes.json());
       }
@@ -110,69 +108,22 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
   const isInsideCampus = lastLog?.direction === 'entry' && lastLog?.status === 'authorized';
 
   return (
-    <div className="max-w-md mx-auto">
-      {/* Phone Mockup Frame - High-DPI 4K Finish */}
-      <div className={`rounded-[2.75rem] shadow-2xl overflow-hidden relative transition-colors duration-200 border-4 ${
-        darkMode 
-          ? 'bg-slate-900 border-slate-700/80 text-slate-100 shadow-blue-950/40 ring-1 ring-slate-800' 
-          : 'bg-white border-slate-300 text-slate-800 shadow-slate-300/60 ring-1 ring-slate-200'
+    <div className="w-full">
+      {/* Contenedor principal — edge-to-edge en móvil, tarjeta en desktop */}
+      <div className={`overflow-hidden relative transition-colors duration-200 lg:rounded-2xl lg:shadow-xl lg:border ${
+        darkMode
+          ? 'bg-slate-900 text-slate-100 lg:border-slate-800'
+          : 'bg-white text-slate-800 lg:border-slate-200'
       }`}>
-        
-        {/* Dynamic Island / Status Bar */}
-        <div className={`pt-3 pb-2 px-6 flex items-center justify-between border-b transition-colors ${
-          darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
-        }`}>
-          <div className="flex items-center gap-1.5">
-            <span className={`text-[11px] font-mono font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              09:41
-            </span>
-          </div>
-          <div className={`w-20 h-4 rounded-full mx-auto flex items-center justify-center ${
-            darkMode ? 'bg-slate-800' : 'bg-slate-300'
-          }`}>
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-900/60 inline-block" />
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
-            <Wifi className="w-3.5 h-3.5" />
-            <Battery className="w-3.5 h-3.5 text-emerald-500" />
-          </div>
-        </div>
 
-        {/* Mobile Header with UNIMINUTO Navy & Gold */}
-        <div className="px-5 py-3.5 bg-blue-900 text-white flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-amber-500 text-blue-950 flex items-center justify-center font-black text-xs shadow-xs">
-              U
-            </div>
-            <div>
-              <h2 className="text-xs font-black tracking-wide uppercase leading-tight text-white">
-                UNIMINUTO Móvil
-              </h2>
-              <p className="text-[10px] font-semibold text-amber-300 leading-tight">
-                Sede Ibagué • Acceso Peatonal
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              loadUserData();
-              onRefresh();
-            }}
-            className="p-1.5 rounded-full hover:bg-white/10 transition-colors text-white"
-            title="Sincronizar"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-
-        {/* Status Pill Indicator */}
-        <div className={`px-5 pt-3 pb-2 flex items-center justify-between border-b transition-colors ${
+        {/* ═══════ STATUS PILL (Dentro/Fuera + Rol) ═══════ */}
+        <div className={`px-5 pt-4 pb-3 flex items-center justify-between border-b transition-colors ${
           darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200'
         }`}>
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${
-              isInsideCampus 
-                ? 'bg-emerald-500 ring-4 ring-emerald-500/20 animate-pulse' 
+              isInsideCampus
+                ? 'bg-emerald-500 ring-4 ring-emerald-500/20 animate-pulse'
                 : 'bg-slate-400'
             }`} />
             <span className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -182,16 +133,30 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
               </strong>
             </span>
           </div>
-          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
-            darkMode 
-              ? 'bg-blue-950 text-blue-300 border-blue-800' 
-              : 'bg-blue-100 text-blue-950 border-blue-200'
-          }`}>
-            {currentUser.role}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                loadUserData();
+                onRefresh();
+              }}
+              className={`p-1.5 rounded-full transition-colors ${
+                darkMode ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-200 text-slate-600'
+              }`}
+              title="Sincronizar"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
+              darkMode
+                ? 'bg-blue-950 text-blue-300 border-blue-800'
+                : 'bg-blue-100 text-blue-950 border-blue-200'
+            }`}>
+              {currentUser.role}
+            </span>
+          </div>
         </div>
 
-        {/* Sub-tab Switcher (Carné vs Historial) */}
+        {/* ═══════ Sub-tab Switcher (Carné vs Historial) ═══════ */}
         <div className={`p-3 border-b transition-colors ${
           darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
         }`}>
@@ -226,22 +191,22 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className={`p-4 min-h-[460px] max-h-[580px] overflow-y-auto transition-colors ${
+        {/* ═══════ Content Area ═══════ */}
+        <div className={`p-4 min-h-[460px] lg:max-h-[600px] overflow-y-auto transition-colors ${
           darkMode ? 'bg-slate-950/60' : 'bg-slate-50/50'
         }`}>
-          
+
           {/* TAB 1: CARNÉ DIGITAL & PERFIL BIOMÉTRICO */}
           {activeSubTab === 'id_card' && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              
+
               {/* Virtual ID Card */}
               <div className={`relative rounded-2xl overflow-hidden p-4 space-y-4 border-2 transition-all shadow-md ${
-                darkMode 
-                  ? 'bg-slate-900 border-slate-800 shadow-black/50' 
+                darkMode
+                  ? 'bg-slate-900 border-slate-800 shadow-black/50'
                   : 'bg-white border-slate-200 shadow-slate-200/50'
               }`}>
-                
+
                 {/* Header of Carné */}
                 <div className={`flex items-center justify-between border-b pb-3 ${
                   darkMode ? 'border-slate-800' : 'border-slate-200'
@@ -262,8 +227,8 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                     </div>
                   </div>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${
-                    darkMode 
-                      ? 'bg-emerald-950 text-emerald-300 border-emerald-800' 
+                    darkMode
+                      ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
                       : 'bg-emerald-100 text-emerald-800 border-emerald-300'
                   }`}>
                     <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
@@ -317,8 +282,8 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                     </p>
                     <div className="pt-1 flex items-center gap-2">
                       <span className={`inline-block text-[9px] font-black uppercase px-2 py-0.5 rounded border ${
-                        darkMode 
-                          ? 'bg-amber-950 text-amber-300 border-amber-800' 
+                        darkMode
+                          ? 'bg-amber-950 text-amber-300 border-amber-800'
                           : 'bg-amber-100 text-amber-900 border-amber-300'
                       }`}>
                         {currentUser.role === 'student' ? 'Estudiante' : currentUser.role}
@@ -460,7 +425,7 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
           {/* TAB 2: HISTORIAL DE ENTRADAS Y SALIDAS */}
           {activeSubTab === 'history' && (
             <div className="space-y-3 animate-in fade-in duration-200">
-              
+
               {/* Filter Buttons */}
               <div className="flex items-center justify-between pb-1">
                 <span className={`text-[11px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -528,8 +493,8 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                       <div
                         key={log.id}
                         className={`p-3 rounded-xl border transition-colors shadow-xs flex items-start justify-between gap-3 ${
-                          darkMode 
-                            ? 'bg-slate-900 border-slate-800 hover:border-slate-700' 
+                          darkMode
+                            ? 'bg-slate-900 border-slate-800 hover:border-slate-700'
                             : 'bg-white border-slate-200 hover:border-slate-300'
                         }`}
                       >
@@ -557,8 +522,8 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                               </span>
                               <span
                                 className={`text-[10px] font-bold ${
-                                  log.status === 'authorized' 
-                                    ? 'text-emerald-500' 
+                                  log.status === 'authorized'
+                                    ? 'text-emerald-500'
                                     : 'text-rose-500'
                                 }`}
                               >
@@ -613,15 +578,15 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
 
         </div>
 
-        {/* Mobile Navigation Bar at Bottom */}
+        {/* ═══════ Mobile Navigation Bar at Bottom ═══════ */}
         <div className={`p-3 border-t flex items-center justify-around text-[10px] transition-colors ${
           darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-500'
         }`}>
           <button
             onClick={() => setActiveSubTab('id_card')}
             className={`flex flex-col items-center gap-1 font-bold ${
-              activeSubTab === 'id_card' 
-                ? darkMode ? 'text-amber-400' : 'text-blue-900' 
+              activeSubTab === 'id_card'
+                ? darkMode ? 'text-amber-400' : 'text-blue-900'
                 : darkMode ? 'hover:text-slate-200' : 'hover:text-slate-800'
             }`}
           >
@@ -632,8 +597,8 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
           <button
             onClick={() => setActiveSubTab('history')}
             className={`flex flex-col items-center gap-1 font-bold ${
-              activeSubTab === 'history' 
-                ? darkMode ? 'text-amber-400' : 'text-blue-900' 
+              activeSubTab === 'history'
+                ? darkMode ? 'text-amber-400' : 'text-blue-900'
                 : darkMode ? 'hover:text-slate-200' : 'hover:text-slate-800'
             }`}
           >

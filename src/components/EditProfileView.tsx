@@ -1,55 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-  ArrowLeft,
-  User as UserIcon,
+  User,
   Phone,
   GraduationCap,
-  Mail,
-  CreditCard,
-  Shield,
-  Camera,
-  AlertCircle,
-  CheckCircle2,
   Save,
   X,
-  Eye,
+  Lock,
+  Camera,
   KeyRound,
+  ShieldCheck,
+  Mail,
+  CreditCard,
   ChevronRight,
+  CheckCircle2,
 } from 'lucide-react';
-import type { UserProfile, UserRole } from '../types.ts';
-import { authFetch, AVATAR_FALLBACK } from '../lib/api.ts';
+import type { UserProfile } from '../types';
+import { authFetch, AVATAR_FALLBACK } from '../lib/api';
 
 interface EditProfileViewProps {
   currentUser: UserProfile;
   onCancel: () => void;
-  onUserUpdated: (user: UserProfile) => void;
-  onOpenAvatarModal?: () => void;
-  onOpenChangePassword?: () => void;
-  darkMode?: boolean;
+  onUserUpdated: (updatedUser: UserProfile) => void;
+  onOpenAvatarModal: () => void;
+  onOpenChangePassword: () => void;
+  darkMode: boolean;
 }
-
-// Etiqueta legible por rol (para la badge del preview)
-const ROLE_LABELS: Record<UserRole, string> = {
-  admin: 'Administrador',
-  security: 'Vigilancia',
-  student: 'Estudiante',
-  teacher: 'Docente',
-  staff: 'Administrativo',
-  visitor: 'Visitante',
-};
-
-// Colores de badge por rol
-const roleBadgeClass = (role: UserRole, darkMode: boolean): string => {
-  const map: Record<UserRole, { light: string; dark: string }> = {
-    admin: { light: 'bg-rose-100 text-rose-800 border-rose-200', dark: 'bg-rose-950 text-rose-300 border-rose-800' },
-    security: { light: 'bg-amber-100 text-amber-800 border-amber-300', dark: 'bg-amber-950 text-amber-300 border-amber-800' },
-    student: { light: 'bg-blue-100 text-blue-800 border-blue-200', dark: 'bg-blue-950 text-blue-300 border-blue-800' },
-    teacher: { light: 'bg-purple-100 text-purple-800 border-purple-200', dark: 'bg-purple-950 text-purple-300 border-purple-800' },
-    staff: { light: 'bg-emerald-100 text-emerald-800 border-emerald-200', dark: 'bg-emerald-950 text-emerald-300 border-emerald-800' },
-    visitor: { light: 'bg-slate-100 text-slate-700 border-slate-200', dark: 'bg-slate-900 text-slate-300 border-slate-700' },
-  };
-  return darkMode ? map[role].dark : map[role].light;
-};
 
 export const EditProfileView: React.FC<EditProfileViewProps> = ({
   currentUser,
@@ -57,453 +32,343 @@ export const EditProfileView: React.FC<EditProfileViewProps> = ({
   onUserUpdated,
   onOpenAvatarModal,
   onOpenChangePassword,
-  darkMode = false,
+  darkMode,
 }) => {
-  const [name, setName] = useState(currentUser.name || '');
+  const [name, setName] = useState(currentUser.name);
   const [phone, setPhone] = useState(currentUser.phone || '');
-  const [facultyOrDept, setFacultyOrDept] = useState(currentUser.facultyOrDept || '');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [program, setProgram] = useState(currentUser.program || '');
 
-  // 🔄 Restaurar estado si el usuario cambia (por si acaso)
-  useEffect(() => {
-    setName(currentUser.name || '');
-    setPhone(currentUser.phone || '');
-    setFacultyOrDept(currentUser.facultyOrDept || '');
-    setError(null);
-    setSuccess(false);
-  }, [currentUser.id]);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // 🎨 ¿Hay cambios sin guardar?
+  // Detectar si hubo cambios para encender el botón de guardar
   const hasChanges =
-    name.trim() !== (currentUser.name || '') ||
-    phone.trim() !== (currentUser.phone || '') ||
-    facultyOrDept.trim() !== (currentUser.facultyOrDept || '');
+    name !== currentUser.name ||
+    phone !== (currentUser.phone || '') ||
+    program !== (currentUser.program || '');
 
-  // ⌨️ Escape cancela
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !loading) {
-        onCancel();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [loading, onCancel]);
-
-  // 🛡️ Salir con confirmación si hay cambios
-  const handleCancel = () => {
-    if (hasChanges && !loading) {
-      if (!confirm('¿Descartar los cambios sin guardar?')) return;
-    }
-    onCancel();
-  };
-
-  // 💾 Guardar cambios
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasChanges) return;
 
-    setError(null);
-    setSuccess(false);
-    setLoading(true);
+    setSaving(true);
+    setMessage(null);
 
     try {
-      const res = await authFetch('/api/users/me', {
-        method: 'PATCH',
+      const res = await authFetch(`/api/users/${currentUser.id}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          phone: phone.trim(),
-          facultyOrDept: facultyOrDept.trim(),
-        }),
+        body: JSON.stringify({ name, phone, program }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al actualizar el perfil');
-
-      setSuccess(true);
-      onUserUpdated(data.user);
-
-      // Cerrar la vista después de un momento
-      setTimeout(() => {
-        onCancel();
-      }, 1200);
-    } catch (err: any) {
-      setError(err.message || 'Ocurrió un error');
+      if (res.ok) {
+        const updated = await res.json();
+        onUserUpdated(updated);
+        setMessage({ type: 'success', text: '¡Información actualizada con éxito!' });
+      } else {
+        const err = await res.json();
+        setMessage({ type: 'error', text: err.message || 'Error al actualizar información.' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Error de conexión con el servidor.' });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  // 📊 Nombre para el preview en vivo
-  const previewName = name.trim() || currentUser.name;
-  const previewFaculty = facultyOrDept.trim() || currentUser.facultyOrDept || 'Sin programa asignado';
-  const previewPhone = phone.trim() || currentUser.phone || 'Sin teléfono';
-
   return (
-    <div className="w-full max-w-7xl mx-auto py-4 lg:py-8 animate-in fade-in duration-200">
-
-      {/* ─────── Botón Volver (arriba) ─────── */}
-      <button
-        onClick={handleCancel}
-        disabled={loading}
-        className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold transition-colors mb-6 ${
-          darkMode
-            ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
-            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-xs'
-        }`}
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>Volver al portal</span>
-      </button>
-
-      {/* ─────── Header ─────── */}
+    <div className="w-full max-w-6xl mx-auto py-6 px-4 sm:px-6 animate-in fade-in duration-300">
+      
+      {/* Encabezado */}
       <div className="mb-8">
-        <h1 className={`text-3xl lg:text-4xl font-black tracking-tight mb-2 ${
-          darkMode ? 'text-white' : 'text-slate-900'
-        }`}>
-          Editar información
+        <h1 className={`text-3xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          Editar Información Personal
         </h1>
-        <p className={`text-sm lg:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          Actualiza tus datos personales. Los cambios se ven reflejados al instante en la vista previa.
+        <p className={`text-xs sm:text-sm mt-1 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+          Actualiza tus datos de contacto. Los cambios se verán reflejados al instante en la vista previa de tu carné.
         </p>
       </div>
 
-      {/* ─────── Layout 2 columnas ─────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-        {/* ═══════ COLUMNA IZQUIERDA: Formulario ═══════ */}
-        <div className="lg:col-span-2">
-          <div className={`p-8 lg:p-10 rounded-3xl border shadow-lg backdrop-blur-sm ${
-            darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'
+        {/* 📝 COLUMNA IZQUIERDA: Formulario de datos (8 cols) */}
+        <div className="lg:col-span-7 xl:col-span-8 space-y-6">
+
+          {/* Banner informativo de campos bloqueados */}
+          <div className={`p-4 rounded-2xl border flex items-start gap-3 backdrop-blur-sm transition-all ${
+            darkMode
+              ? 'bg-amber-950/30 border-amber-800/50 text-amber-300'
+              : 'bg-amber-50/80 border-amber-200 text-amber-900'
           }`}>
-
-            {/* Aviso de campos bloqueados */}
-            <div className={`mb-6 p-4 rounded-2xl border text-xs leading-relaxed flex items-start gap-3 ${
-              darkMode
-                ? 'bg-amber-950/40 border-amber-800 text-amber-200'
-                : 'bg-amber-50 border-amber-300 text-amber-900'
-            }`}>
-              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-              <div>
-                <strong className="block mb-0.5">Datos institucionales bloqueados</strong>
-                Tu cédula, correo y rol son datos críticos y solo pueden ser modificados por coordinación.
-              </div>
+            <Lock className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="text-xs leading-relaxed">
+              <strong className="font-bold block mb-0.5">Datos institucionales protegidos</strong>
+              Tu cédula/carné, correo institucional y rol de acceso son administrados por coordinación académica y no se pueden modificar directamente.
             </div>
+          </div>
 
-            {/* Success banner */}
-            {success && (
-              <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-300 flex items-center gap-3 text-sm text-emerald-800 font-medium animate-in fade-in duration-200">
-                <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
-                <span>¡Perfil actualizado correctamente!</span>
-              </div>
-            )}
+          {/* Mensaje de respuesta (Success/Error) */}
+          {message && (
+            <div className={`p-3.5 rounded-2xl border text-xs font-bold flex items-center gap-2 ${
+              message.type === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
+                : 'bg-rose-500/10 border-rose-500/20 text-rose-500'
+            }`}>
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{message.text}</span>
+            </div>
+          )}
 
-            {/* Error banner */}
-            {error && (
-              <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-300 flex items-start gap-3 text-sm text-rose-800 font-medium">
-                <AlertCircle className="w-5 h-5 shrink-0 text-rose-600 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-
-              {/* Nombre completo */}
+          {/* Formulario Principal */}
+          <form onSubmit={handleSubmit} className={`p-6 sm:p-8 rounded-3xl border shadow-xl transition-colors backdrop-blur-sm ${
+            darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/95 border-slate-200'
+          }`}>
+            <div className="space-y-5">
+              
+              {/* Campo Nombre Completo */}
               <div>
-                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${
+                <label className={`block text-xs font-bold mb-1.5 uppercase tracking-wider ${
                   darkMode ? 'text-slate-300' : 'text-slate-700'
                 }`}>
                   Nombre Completo <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <UserIcon className="w-4 h-4 absolute left-4 top-4 text-slate-400" />
+                  <User className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
                   <input
                     type="text"
-                    required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    required
                     placeholder="Tu nombre completo"
-                    minLength={3}
-                    maxLength={80}
-                    className={`w-full pl-11 pr-4 py-3.5 border rounded-2xl text-sm focus:outline-hidden transition-colors ${
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl text-xs font-semibold border transition-all focus:outline-none focus:ring-2 ${
                       darkMode
-                        ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-cyan-500'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-900'
+                        ? 'bg-slate-950/60 border-slate-800 text-white focus:ring-blue-500/50 focus:border-blue-500'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-blue-500/30 focus:border-blue-600'
                     }`}
                   />
                 </div>
-                <p className={`text-[11px] mt-1.5 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                  Mínimo 3 caracteres, máximo 80.
+                <p className={`text-[10px] mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Mínimo 3 caracteres. Usa tu nombre tal como figura en tu documento.
                 </p>
               </div>
 
-              {/* Teléfono */}
+              {/* Campo Teléfono */}
               <div>
-                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${
+                <label className={`block text-xs font-bold mb-1.5 uppercase tracking-wider ${
                   darkMode ? 'text-slate-300' : 'text-slate-700'
                 }`}>
-                  Teléfono <span className={`font-normal normal-case ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>(opcional)</span>
+                  Teléfono / Celular <span className="text-slate-400 font-normal">(Opcional)</span>
                 </label>
                 <div className="relative">
-                  <Phone className="w-4 h-4 absolute left-4 top-4 text-slate-400" />
+                  <Phone className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
                   <input
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="Ej: 3001234567"
-                    maxLength={15}
-                    className={`w-full pl-11 pr-4 py-3.5 border rounded-2xl text-sm focus:outline-hidden transition-colors ${
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl text-xs font-semibold border transition-all focus:outline-none focus:ring-2 ${
                       darkMode
-                        ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-cyan-500'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-900'
+                        ? 'bg-slate-950/60 border-slate-800 text-white focus:ring-blue-500/50 focus:border-blue-500'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-blue-500/30 focus:border-blue-600'
                     }`}
                   />
                 </div>
-                <p className={`text-[11px] mt-1.5 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                  Entre 7 y 15 dígitos. Sin espacios ni guiones.
-                </p>
               </div>
 
-              {/* Programa / Facultad */}
+              {/* Campo Programa / Facultad */}
               <div>
-                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${
+                <label className={`block text-xs font-bold mb-1.5 uppercase tracking-wider ${
                   darkMode ? 'text-slate-300' : 'text-slate-700'
                 }`}>
                   Programa / Facultad
                 </label>
                 <div className="relative">
-                  <GraduationCap className="w-4 h-4 absolute left-4 top-4 text-slate-400" />
+                  <GraduationCap className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
                   <input
                     type="text"
-                    value={facultyOrDept}
-                    onChange={(e) => setFacultyOrDept(e.target.value)}
+                    value={program}
+                    onChange={(e) => setProgram(e.target.value)}
                     placeholder="Ej: Ingeniería de Sistemas"
-                    maxLength={120}
-                    className={`w-full pl-11 pr-4 py-3.5 border rounded-2xl text-sm focus:outline-hidden transition-colors ${
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl text-xs font-semibold border transition-all focus:outline-none focus:ring-2 ${
                       darkMode
-                        ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-cyan-500'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-900'
+                        ? 'bg-slate-950/60 border-slate-800 text-white focus:ring-blue-500/50 focus:border-blue-500'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-blue-500/30 focus:border-blue-600'
                     }`}
                   />
                 </div>
               </div>
+            </div>
 
-              {/* Botones */}
-              <div className={`flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-4 border-t ${
-                darkMode ? 'border-slate-800' : 'border-slate-200'
-              }`}>
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  disabled={loading}
-                  className={`w-full sm:w-auto px-6 py-3 rounded-2xl text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
-                    darkMode
-                      ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                >
-                  <X className="w-4 h-4" />
-                  <span>Cancelar</span>
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading || !hasChanges}
-                  className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-blue-900 hover:bg-blue-800 text-white text-sm font-black transition-all shadow-lg hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Guardando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      <span>Guardar cambios</span>
-                    </>
-                  )}
-                </button>
-              </div>
+            {/* Acciones de guardar / cancelar */}
+            <div className="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-slate-200/20">
+              <button
+                type="button"
+                onClick={onCancel}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+                  darkMode
+                    ? 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <X className="w-4 h-4" />
+                <span>Cancelar</span>
+              </button>
 
-              {hasChanges && !loading && (
-                <p className={`text-xs text-center pt-1 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
-                  Tienes cambios sin guardar
-                </p>
-              )}
-            </form>
+              <button
+                type="submit"
+                disabled={!hasChanges || saving}
+                className={`flex items-center gap-2 px-7 py-3 rounded-xl text-xs font-black shadow-lg transition-all active:scale-95 ${
+                  hasChanges && !saving
+                    ? 'bg-blue-900 hover:bg-blue-800 text-white shadow-blue-900/30 cursor-pointer'
+                    : 'bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-600 cursor-not-allowed shadow-none'
+                }`}
+              >
+                <Save className={`w-4 h-4 ${hasChanges ? 'text-amber-400' : ''}`} />
+                <span>{saving ? 'Guardando...' : 'Guardar cambios'}</span>
+              </button>
+            </div>
+          </form>
 
-            {/* ─────── Cambiar contraseña (acción separada) ─────── */}
-            {onOpenChangePassword && (
-              <div className={`mt-8 pt-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <KeyRound className={`w-4 h-4 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
-                  <h3 className={`text-xs font-black uppercase tracking-wider ${
-                    darkMode ? 'text-slate-300' : 'text-slate-700'
-                  }`}>
-                    Seguridad de la cuenta
-                  </h3>
+          {/* Sección de Seguridad de la cuenta */}
+          <div className={`p-6 rounded-3xl border shadow-xl transition-colors backdrop-blur-sm ${
+            darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/95 border-slate-200'
+          }`}>
+            <h3 className="text-xs font-black uppercase tracking-wider text-amber-500 mb-4 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4" />
+              Seguridad de la cuenta
+            </h3>
+
+            <button
+              type="button"
+              onClick={onOpenChangePassword}
+              className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all group ${
+                darkMode
+                  ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/50'
+                  : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-slate-100/80'
+              }`}
+            >
+              <div className="flex items-center gap-3.5">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-transform group-hover:scale-105 ${
+                  darkMode ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-600'
+                }`}>
+                  <KeyRound className="w-5 h-5" />
                 </div>
-
-                <button
-                  type="button"
-                  onClick={onOpenChangePassword}
-                  className={`w-full flex items-center justify-between gap-4 p-4 rounded-2xl border transition-all text-left group ${
-                    darkMode
-                      ? 'bg-slate-950 border-slate-800 hover:border-amber-700 hover:bg-slate-900'
-                      : 'bg-slate-50 border-slate-200 hover:border-amber-300 hover:bg-amber-50/40'
-                  }`}
-                >
-                  <div className="flex-1">
-                    <p className={`text-sm font-bold mb-0.5 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      Cambiar mi contraseña
-                    </p>
-                    <p className={`text-[11px] ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                      Recomendado si sospechas que tu cuenta fue comprometida.
-                      Al cambiarla, se cerrarán todas tus sesiones activas.
-                    </p>
-                  </div>
-                  <ChevronRight className={`w-5 h-5 shrink-0 transition-transform group-hover:translate-x-0.5 ${
-                    darkMode ? 'text-slate-600' : 'text-slate-400'
-                  }`} />
-                </button>
+                <div>
+                  <p className={`text-xs font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Cambiar mi contraseña
+                  </p>
+                  <p className={`text-[11px] mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Recomendado si sospechas que tu cuenta fue comprometida.
+                  </p>
+                </div>
               </div>
-            )}
+              <ChevronRight className="w-5 h-5 text-slate-400 group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
         </div>
 
-        {/* ═══════ COLUMNA DERECHA: Preview en vivo ═══════ */}
-        <div className="lg:col-span-1">
-          <div className={`p-6 lg:p-8 rounded-3xl border shadow-lg sticky top-24 backdrop-blur-sm ${
-            darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'
+        {/* 🎴 COLUMNA DERECHA: Vista Previa del Carné (5 cols) */}
+        <div className="lg:col-span-5 xl:col-span-4 sticky top-24">
+          <div className={`p-6 rounded-3xl border shadow-2xl transition-all backdrop-blur-sm ${
+            darkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/95 border-slate-200'
           }`}>
-
-            {/* Header del preview */}
-            <div className="flex items-center gap-2 mb-6">
-              <Eye className={`w-4 h-4 ${darkMode ? 'text-cyan-400' : 'text-blue-900'}`} />
-              <h2 className={`text-xs font-black uppercase tracking-wider ${
-                darkMode ? 'text-slate-300' : 'text-slate-700'
+            
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-200/20">
+              <span className={`text-[10px] font-mono font-black uppercase tracking-widest px-2.5 py-1 rounded-md border ${
+                darkMode ? 'bg-blue-950/80 text-blue-300 border-blue-800' : 'bg-blue-50 text-blue-900 border-blue-200'
               }`}>
-                Vista previa
-              </h2>
+                Vista Previa en Vivo
+              </span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" title="Actualizando en tiempo real" />
             </div>
 
-            {/* Foto + botón cambiar */}
-            <div className="flex flex-col items-center mb-6">
-              <div className="relative mb-4">
+            {/* Tarjeta Visual de Perfil / Carné */}
+            <div className="flex flex-col items-center text-center">
+              
+              {/* Avatar con botón de cambio de foto */}
+              <div className="relative group mb-4">
+                <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-amber-500 to-blue-600 blur-sm opacity-70 group-hover:opacity-100 transition-opacity" />
                 <img
                   src={currentUser.avatarUrl || AVATAR_FALLBACK}
-                  alt={previewName}
-                  className="w-28 h-28 rounded-full object-cover ring-4 ring-cyan-500/30 shadow-2xl"
+                  alt={name || 'Usuario'}
+                  className="relative w-24 h-24 rounded-full object-cover ring-4 ring-slate-950 shadow-xl"
                   referrerPolicy="no-referrer"
                 />
-                {onOpenAvatarModal && (
-                  <button
-                    type="button"
-                    onClick={onOpenAvatarModal}
-                    title="Cambiar foto de perfil"
-                    className={`absolute -bottom-1 -right-1 w-10 h-10 rounded-full flex items-center justify-center border-2 shadow-lg transition-transform hover:scale-110 ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-cyan-400 hover:bg-slate-700'
-                        : 'bg-white border-slate-200 text-blue-900 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Camera className="w-4 h-4" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={onOpenAvatarModal}
+                  title="Cambiar foto de perfil"
+                  className="absolute bottom-0 right-0 p-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg ring-2 ring-slate-950 transition-transform hover:scale-110 active:scale-95"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Nombre en vivo */}
-              <h3 className={`text-lg font-black text-center leading-tight ${
+              {/* Nombre e Identidad */}
+              <h2 className={`text-lg font-black tracking-tight max-w-[220px] truncate ${
                 darkMode ? 'text-white' : 'text-slate-900'
               }`}>
-                {previewName}
-              </h3>
-
-              {/* Rol badge */}
-              <span className={`inline-block mt-2 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
-                roleBadgeClass(currentUser.role, darkMode)
+                {name || 'Tu Nombre'}
+              </h2>
+              
+              <span className={`mt-1 inline-block text-[10px] font-extrabold uppercase tracking-wider px-3 py-0.5 rounded-full border ${
+                darkMode ? 'bg-blue-950 text-blue-300 border-blue-800' : 'bg-blue-100 text-blue-900 border-blue-200'
               }`}>
-                {ROLE_LABELS[currentUser.role] || currentUser.role}
+                {currentUser.role === 'student' ? 'Estudiante' : currentUser.role}
               </span>
-            </div>
 
-            {/* Separador */}
-            <div className={`border-t my-4 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
-
-            {/* Datos del preview */}
-            <div className="space-y-3 text-xs">
-
-              <div className="flex items-start gap-3">
-                <Mail className={`w-4 h-4 shrink-0 mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
-                <div className="min-w-0 flex-1">
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Correo
-                  </p>
-                  <p className={`font-mono truncate ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    {currentUser.email}
-                  </p>
+              {/* Datos del Carné */}
+              <div className="w-full mt-6 pt-5 border-t border-slate-200/20 space-y-3 text-left">
+                
+                <div className="flex items-center gap-3 text-xs">
+                  <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div className="overflow-hidden">
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Correo</p>
+                    <p className={`font-semibold truncate ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{currentUser.email}</p>
+                  </div>
                 </div>
+
+                <div className="flex items-center gap-3 text-xs">
+                  <CreditCard className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Cédula / Carné</p>
+                    <p className={`font-semibold font-mono ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{currentUser.documentId}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-xs">
+                  <Phone className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Teléfono</p>
+                    <p className={`font-semibold ${phone ? (darkMode ? 'text-slate-200' : 'text-slate-800') : 'text-slate-400 italic'}`}>
+                      {phone || 'Sin registrar'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-xs">
+                  <GraduationCap className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Programa</p>
+                    <p className={`font-semibold ${program ? (darkMode ? 'text-slate-200' : 'text-slate-800') : 'text-slate-400 italic'}`}>
+                      {program || 'Sin registrar'}
+                    </p>
+                  </div>
+                </div>
+
               </div>
 
-              <div className="flex items-start gap-3">
-                <CreditCard className={`w-4 h-4 shrink-0 mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
-                <div className="min-w-0 flex-1">
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Cédula / Carné
-                  </p>
-                  <p className={`font-mono ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    {currentUser.documentId}
-                  </p>
-                </div>
+              {/* Pie de tarjeta */}
+              <div className={`w-full mt-6 p-3 rounded-2xl border text-[10px] text-center ${
+                darkMode ? 'bg-slate-950/50 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'
+              }`}>
+                UNIMINUTO • Sede Ibagué
               </div>
 
-              <div className="flex items-start gap-3">
-                <Phone className={`w-4 h-4 shrink-0 mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
-                <div className="min-w-0 flex-1">
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Teléfono
-                  </p>
-                  <p className={`font-mono ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    {previewPhone}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <GraduationCap className={`w-4 h-4 shrink-0 mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
-                <div className="min-w-0 flex-1">
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Programa / Facultad
-                  </p>
-                  <p className={`${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    {previewFaculty}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <Shield className={`w-4 h-4 shrink-0 mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
-                <div className="min-w-0 flex-1">
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Estado de la cuenta
-                  </p>
-                  <p className={`font-bold ${currentUser.status === 'active' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    ● {currentUser.status === 'active' ? 'Activa' : 'Suspendida'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Aviso de solo lectura */}
-            <div className={`mt-6 p-3 rounded-xl border text-[10px] leading-relaxed ${
-              darkMode ? 'bg-slate-950 border-slate-800 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-500'
-            }`}>
-              Los campos en gris (correo, cédula, rol) son de solo lectura y no se pueden modificar desde aquí.
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );

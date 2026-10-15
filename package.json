@@ -4,16 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-      "dev": "tsx server.ts",
-      "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/server.cjs",
-      "start": "node dist/server.cjs",
-      "lint": "tsc --noEmit",
-      "preview": "vite preview"
+    "dev": "tsx server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
+    "lint": "tsc --noEmit",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "dotenv": "^18.0.5",
     "express": "^5.2.1",
+    "framer-motion": "^14.3.0",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.52.0",
     "mongoose": "^9.10.4",
