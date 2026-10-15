@@ -22,3 +22,11 @@
 - Revocación de tokens al cambiar contraseña (fuerza re-login global)
 - Validación de `sessionInvalidBefore` en `authenticateToken`
 - Validación de campos editables (`name`, `phone`, `facultyOrDept`)
+
+## 📜 Registro de Cambios
+
+### [v1.2.0] - Rediseño Dashboard Frontend
+- **Modificado**: `WebAppView.tsx` rediseñado por completo con estética institucional Uniminuto.
+- **Añadido**: Componente visual de carné digital con chip NFC/RFID y QR peatonal.
+- **Añadido**: Instalación e integración de `framer-motion` para animaciones del dashboard.
+- **Mejorado**: Filtrado rápido de historial de accesos y vista de métricas/KPIs.
