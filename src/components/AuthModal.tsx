@@ -8,6 +8,11 @@ import {
   KeyRound,
   Eye,
   EyeOff,
+  LogIn,
+  UserPlus,
+  CreditCard,
+  GraduationCap,
+  ShieldCheck,
 } from 'lucide-react';
 import type { UserRole, UserProfile } from '../types.ts';
 import { PasswordRequirements } from './PasswordRequirements.tsx';
@@ -146,18 +151,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
       <div
         id="auth-modal-dialog"
-        className={`w-full max-w-md rounded-3xl border shadow-2xl overflow-hidden p-6 sm:p-8 relative transition-colors ${
-          darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+        className={`w-full max-w-md rounded-3xl border shadow-2xl overflow-hidden p-6 sm:p-8 relative transition-all duration-300 ${
+          darkMode ? 'bg-slate-900/95 border-slate-800 text-slate-100 shadow-black/80' : 'bg-white/95 border-slate-200 text-slate-900 shadow-xl'
         }`}
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          className={`absolute top-4 right-4 p-1.5 rounded-lg transition-colors ${
-            darkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+          className={`absolute top-4 right-4 p-2 rounded-xl transition-colors z-10 ${
+            darkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
           }`}
         >
           <X className="w-5 h-5" />
@@ -166,11 +171,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Header */}
         <div className="text-center mb-6">
           <div
-            className={`inline-flex items-center justify-center w-12 h-12 rounded-2xl border mb-3 shadow-xs ${
-              darkMode ? 'bg-blue-950 text-blue-300 border-blue-800' : 'bg-blue-50 border-blue-200 text-blue-900'
+            className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl border mb-3 shadow-inner ${
+              darkMode ? 'bg-blue-950/80 border-blue-800 text-blue-400' : 'bg-blue-50 border-blue-200 text-blue-900'
             }`}
           >
-            <Lock className="w-6 h-6" />
+            <ShieldCheck className="w-7 h-7" />
           </div>
           <h2 className="text-xl font-black tracking-tight">
             {mode === 'login' ? 'Iniciar Sesión Institucional' : 'Registro en el Sistema'}
@@ -182,8 +187,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Tab switch */}
         <div
-          className={`flex p-1 rounded-xl border mb-5 ${
-            darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
+          className={`p-1.5 rounded-2xl border mb-6 grid grid-cols-2 gap-1 ${
+            darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-100 border-slate-200'
           }`}
         >
           <button
@@ -192,17 +197,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               setMode('login');
               setError(null);
             }}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all ${
               mode === 'login'
-                ? darkMode
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-blue-900 text-white shadow-xs'
+                ? 'bg-blue-900 text-white shadow-md'
                 : darkMode
-                  ? 'text-slate-400 hover:text-slate-200'
-                  : 'text-slate-600 hover:text-slate-900'
+                ? 'text-slate-400 hover:text-white'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Ingresar
+            <LogIn className="w-4 h-4" />
+            <span>Ingresar</span>
           </button>
           <button
             type="button"
@@ -210,24 +214,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               setMode('register');
               setError(null);
             }}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all ${
               mode === 'register'
-                ? darkMode
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-blue-900 text-white shadow-xs'
+                ? 'bg-blue-900 text-white shadow-md'
                 : darkMode
-                  ? 'text-slate-400 hover:text-slate-200'
-                  : 'text-slate-600 hover:text-slate-900'
+                ? 'text-slate-400 hover:text-white'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Registrarse con Rol
+            <UserPlus className="w-4 h-4" />
+            <span>Registrarse con Rol</span>
           </button>
         </div>
 
         {/* Error notification */}
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-300 flex items-start gap-2.5 text-xs text-rose-800 font-medium">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+          <div className="mb-5 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
@@ -237,38 +240,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {mode === 'register' && (
             <>
               <div>
-                <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Nombre Completo
+                <label className={`block text-xs font-bold mb-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Nombre Completo <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <User className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <User className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Nombre completo"
-                    className={`w-full pl-9 pr-3 py-2 border rounded-xl text-xs focus:outline-hidden ${
+                    className={`w-full pl-10 pr-4 py-2.5 border rounded-xl text-xs font-medium transition-all focus:outline-none focus:ring-2 ${
                       darkMode
-                        ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-blue-500'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-900'
+                        ? 'bg-slate-950/60 border-slate-800 text-white focus:ring-blue-500/50 focus:border-blue-500'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-blue-500/30 focus:border-blue-600'
                     }`}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Rol Institucional
+                  <label className={`block text-xs font-bold mb-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Rol Institucional <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value as UserRole)}
-                    className={`w-full px-2.5 py-2 border rounded-xl text-xs focus:outline-hidden ${
+                    className={`w-full px-3 py-2.5 border rounded-xl text-xs font-bold transition-all focus:outline-none focus:ring-2 ${
                       darkMode
-                        ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-900'
+                        ? 'bg-slate-950 border-slate-800 text-white focus:ring-blue-500/50 focus:border-blue-500'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-blue-500/30 focus:border-blue-600'
                     }`}
                   >
                     <option value="student">Estudiante</option>
@@ -280,97 +283,103 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
 
                 <div>
-                  <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Cédula / Carné ID
+                  <label className={`block text-xs font-bold mb-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Cédula / Carné ID <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={documentId}
-                    onChange={(e) => setDocumentId(e.target.value)}
-                    placeholder="1005892341"
-                    className={`w-full px-3 py-2 border rounded-xl text-xs font-mono focus:outline-hidden ${
-                      darkMode
-                        ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-blue-500'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-900'
-                    }`}
-                  />
+                  <div className="relative">
+                    <CreditCard className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <input
+                      type="text"
+                      required
+                      value={documentId}
+                      onChange={(e) => setDocumentId(e.target.value)}
+                      placeholder="1005892341"
+                      className={`w-full pl-9 pr-3 py-2.5 border rounded-xl text-xs font-mono font-semibold transition-all focus:outline-none focus:ring-2 ${
+                        darkMode
+                          ? 'bg-slate-950/60 border-slate-800 text-white focus:ring-blue-500/50 focus:border-blue-500'
+                          : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-blue-500/30 focus:border-blue-600'
+                      }`}
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* 🎓 Programa / Facultad — SELECT con optgroups */}
               <div>
-                <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className={`block text-xs font-bold mb-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                   Programa / Facultad
                 </label>
-                <select
-                  required
-                  value={facultyOrDept}
-                  onChange={(e) => setFacultyOrDept(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-xl text-xs focus:outline-hidden ${
-                    darkMode
-                      ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500'
-                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-900'
-                  }`}
-                >
-                  <option value="" disabled>
-                    Selecciona tu programa o dependencia
-                  </option>
+                <div className="relative">
+                  <GraduationCap className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <select
+                    required
+                    value={facultyOrDept}
+                    onChange={(e) => setFacultyOrDept(e.target.value)}
+                    className={`w-full pl-10 pr-4 py-2.5 border rounded-xl text-xs font-medium transition-all focus:outline-none focus:ring-2 ${
+                      darkMode
+                        ? 'bg-slate-950 border-slate-800 text-white focus:ring-blue-500/50 focus:border-blue-500'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-blue-500/30 focus:border-blue-600'
+                    }`}
+                  >
+                    <option value="" disabled>
+                      Selecciona tu programa o dependencia
+                    </option>
 
-                  <optgroup label="Pregrado">
-                    <option value="Administración de Empresas">Administración de Empresas</option>
-                    <option value="Administración en Salud Ocupacional">Administración en Salud Ocupacional</option>
-                    <option value="Contaduría Pública">Contaduría Pública</option>
-                    <option value="Ingeniería de Sistemas">Ingeniería de Sistemas</option>
-                    <option value="Ingeniería Civil">Ingeniería Civil</option>
-                    <option value="Ingeniería de Software">Ingeniería de Software</option>
-                    <option value="Ingeniería Industrial">Ingeniería Industrial</option>
-                    <option value="Psicología">Psicología</option>
-                    <option value="Trabajo Social">Trabajo Social</option>
-                    <option value="Comunicación Social y Periodismo">Comunicación Social y Periodismo</option>
-                    <option value="Licenciatura en Educación Infantil">Licenciatura en Educación Infantil</option>
-                  </optgroup>
+                    <optgroup label="Pregrado">
+                      <option value="Administración de Empresas">Administración de Empresas</option>
+                      <option value="Administración en Salud Ocupacional">Administración en Salud Ocupacional</option>
+                      <option value="Contaduría Pública">Contaduría Pública</option>
+                      <option value="Ingeniería de Sistemas">Ingeniería de Sistemas</option>
+                      <option value="Ingeniería Civil">Ingeniería Civil</option>
+                      <option value="Ingeniería de Software">Ingeniería de Software</option>
+                      <option value="Ingeniería Industrial">Ingeniería Industrial</option>
+                      <option value="Psicología">Psicología</option>
+                      <option value="Trabajo Social">Trabajo Social</option>
+                      <option value="Comunicación Social y Periodismo">Comunicación Social y Periodismo</option>
+                      <option value="Licenciatura en Educación Infantil">Licenciatura en Educación Infantil</option>
+                    </optgroup>
 
-                  <optgroup label="Posgrado">
-                    <option value="Especialización en Gerencia de Proyectos">Especialización en Gerencia de Proyectos</option>
-                    <option value="Especialización en Gerencia de la SST">Especialización en Gerencia de la SST</option>
-                  </optgroup>
+                    <optgroup label="Posgrado">
+                      <option value="Especialización en Gerencia de Proyectos">Especialización en Gerencia de Proyectos</option>
+                      <option value="Especialización en Gerencia de la SST">Especialización en Gerencia de la SST</option>
+                    </optgroup>
 
-                  <optgroup label="Administrativos">
-                    <option value="Coordinación Académica">Coordinación Académica</option>
-                    <option value="Coordinación Administrativa">Coordinación Administrativa</option>
-                    <option value="Bienestar Universitario">Bienestar Universitario</option>
-                    <option value="Registro y Admisiones">Registro y Admisiones</option>
-                    <option value="Biblioteca">Biblioteca</option>
-                    <option value="Talento Humano">Talento Humano</option>
-                    <option value="Sistemas y Tecnología">Sistemas y Tecnología</option>
-                  </optgroup>
+                    <optgroup label="Administrativos">
+                      <option value="Coordinación Académica">Coordinación Académica</option>
+                      <option value="Coordinación Administrativa">Coordinación Administrativa</option>
+                      <option value="Bienestar Universitario">Bienestar Universitario</option>
+                      <option value="Registro y Admisiones">Registro y Admisiones</option>
+                      <option value="Biblioteca">Biblioteca</option>
+                      <option value="Talento Humano">Talento Humano</option>
+                      <option value="Sistemas y Tecnología">Sistemas y Tecnología</option>
+                    </optgroup>
 
-                  <optgroup label="Otros">
-                    <option value="Visitante externo">Visitante externo</option>
-                    <option value="Otro">Otro</option>
-                  </optgroup>
-                </select>
+                    <optgroup label="Otros">
+                      <option value="Visitante externo">Visitante externo</option>
+                      <option value="Otro">Otro</option>
+                    </optgroup>
+                  </select>
+                </div>
               </div>
             </>
           )}
 
           <div>
-            <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              Correo Electrónico Institucional
+            <label className={`block text-xs font-bold mb-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              Correo Electrónico Institucional <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+              <Mail className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="usuario@uniminuto.edu.co"
-                className={`w-full pl-9 pr-3 py-2 border rounded-xl text-xs focus:outline-hidden ${
+                className={`w-full pl-10 pr-4 py-2.5 border rounded-xl text-xs font-medium transition-all focus:outline-none focus:ring-2 ${
                   darkMode
-                    ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-blue-500'
-                    : 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-900'
+                    ? 'bg-slate-950/60 border-slate-800 text-white focus:ring-blue-500/50 focus:border-blue-500'
+                    : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-blue-500/30 focus:border-blue-600'
                 }`}
               />
             </div>
@@ -378,21 +387,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {/* 🔒 Contraseña con toggle mostrar/ocultar */}
           <div>
-            <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              Contraseña
+            <label className={`block text-xs font-bold mb-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              Contraseña <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
-              <KeyRound className="w-4 h-4 absolute left-3 top-3 text-slate-400 pointer-events-none" />
+              <KeyRound className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className={`w-full pl-9 pr-10 py-2 border rounded-xl text-xs focus:outline-hidden ${
+                className={`w-full pl-10 pr-10 py-2.5 border rounded-xl text-xs font-medium transition-all focus:outline-none focus:ring-2 ${
                   darkMode
-                    ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-blue-500'
-                    : 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-900'
+                    ? 'bg-slate-950/60 border-slate-800 text-white focus:ring-blue-500/50 focus:border-blue-500'
+                    : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-blue-500/30 focus:border-blue-600'
                 }`}
               />
               <button
@@ -400,10 +409,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                className={`absolute right-2 top-1.5 p-1 rounded-lg transition-colors ${
-                  darkMode
-                    ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${
+                  darkMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'
                 }`}
                 tabIndex={-1}
               >
@@ -424,13 +431,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             disabled={submitDisabled}
-            className="w-full py-2.5 px-4 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs tracking-wide transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            className={`w-full py-3 mt-3 rounded-xl font-black text-xs shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 ${
+              !submitDisabled
+                ? 'bg-blue-900 hover:bg-blue-800 text-white shadow-blue-950/20 cursor-pointer'
+                : 'bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-600 cursor-not-allowed shadow-none'
+            }`}
           >
-            {loading
-              ? 'Procesando...'
-              : mode === 'login'
+            <Lock className={`w-4 h-4 ${!submitDisabled ? 'text-amber-400' : ''}`} />
+            <span>
+              {loading
+                ? 'Procesando...'
+                : mode === 'login'
                 ? 'Iniciar Sesión'
                 : 'Crear Cuenta'}
+            </span>
           </button>
         </form>
       </div>

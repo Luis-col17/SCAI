@@ -16,6 +16,7 @@ export interface UserProfile {
   documentId: string;
   facultyOrDept?: string;
   phone?: string;
+  program?: string;  
   avatarUrl?: string;
   avatarPublicId?: string;
   status: UserStatus;

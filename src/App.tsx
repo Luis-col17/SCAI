@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Navbar } from './components/Navbar.tsx';
-import { AuthModal } from './components/AuthModal.tsx';
-import { MobileAppView } from './components/MobileAppView.tsx';
-import { WebAppView } from './components/WebAppView.tsx';
-import { RecognitionCameraModule } from './components/RecognitionCameraModule.tsx';
-import { FaceEnrollmentView } from './components/FaceEnrollmentView.tsx';
-import { AdminDashboard } from './components/AdminDashboard.tsx';
-import { TechnicalInfoModal } from './components/TechnicalInfoModal.tsx';
-import { EditProfileView } from './components/EditProfileView.tsx';
-import { ChangePasswordModal } from './components/ChangePasswordModal.tsx';
-import { AvatarModal } from './components/AvatarModal.tsx';
-import { storeToken, clearStoredToken } from './lib/api.ts';
-import type { UserProfile, AccessLog, SystemStats } from './types.ts';
-import { authFetch } from './lib/api.ts';
-import { Lock, Smartphone, Camera, Sparkles, Clock } from 'lucide-react';
+import { Navbar } from './components/Navbar';
+import { AuthModal } from './components/AuthModal';
+import { MobileAppView } from './components/MobileAppView';
+import { WebAppView } from './components/WebAppView';
+import { InteractiveBackground } from './components/InteractiveBackground';
+import { RecognitionCameraModule } from './components/RecognitionCameraModule';
+import { FaceEnrollmentView } from './components/FaceEnrollmentView';
+import { SelfEnrollmentView } from './components/SelfEnrollmentView';
+import { AdminDashboard } from './components/AdminDashboard';
+import { TechnicalInfoModal } from './components/TechnicalInfoModal';
+import { EditProfileView } from './components/EditProfileView';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
+import { AvatarModal } from './components/AvatarModal';
+import { storeToken, clearStoredToken } from './lib/api';
+import type { UserProfile, AccessLog, SystemStats } from './types';
+import { authFetch } from './lib/api';
+import { Lock, Smartphone, Camera, Sparkles, Clock, ScanFace, CheckCircle2, ArrowRight } from 'lucide-react';
 
 // 🎨 Selector de logo SCAI Horizon según modo claro/oscuro
 const SCAI_LOGO_LIGHT = '/img/logoclaro.png';
@@ -25,8 +27,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'mobile' | 'camera' | 'enrollment' | 'admin'>('mobile');
   const [darkMode, setDarkMode] = useState(false);
 
-  // 🖥️ Vista activa: 'main' (contenido normal) o 'edit-profile' (vista de edición)
-  const [activeView, setActiveView] = useState<'main' | 'edit-profile'>('main');
+  // 🖥️ Vista activa: 'main' (contenido normal), 'edit-profile' o 'self-enrollment'
+  const [activeView, setActiveView] = useState<'main' | 'edit-profile' | 'self-enrollment'>('main');
 
   // Modals
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -40,17 +42,12 @@ export default function App() {
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Persistencia de sesión: el usuario autenticado se conserva al recargar la página.
+  // Persistencia de sesión
   const SESSION_KEY = 'uniminuto_session';
   const restoredRef = useRef(false);
 
   // 🎨 Logo SCAI que cambia según el modo
   const scaiLogo = darkMode ? SCAI_LOGO_DARK : SCAI_LOGO_LIGHT;
-
-  // 🌊 Patrón ripple de fondo (radar cyan). Mismo cyan del logo en ambos modos.
-  const rippleBackground = darkMode
-    ? 'repeating-radial-gradient(circle at 50% 50%, transparent 0, transparent 40px, rgba(6, 182, 212, 0.50) 41px, transparent 42px)'
-    : 'repeating-radial-gradient(circle at 50% 50%, transparent 0, transparent 40px, rgba(6, 182, 212, 0.55) 41px, transparent 42px)';
 
   // Load all system data
   const fetchData = async () => {
@@ -61,7 +58,6 @@ export default function App() {
         authFetch('/api/stats'),
       ]);
 
-      // Las rutas requieren sesión: si el token expiró o fue revocado, se limpia.
       if ((usersRes.status === 401 || usersRes.status === 403) && authToken) {
         clearStoredToken();
         localStorage.removeItem(SESSION_KEY);
@@ -87,7 +83,6 @@ export default function App() {
     }
   };
 
-  // Restore persisted session (token + user) so a reload keeps the logged-in person
   useEffect(() => {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
@@ -129,12 +124,10 @@ export default function App() {
     }
   }, []);
 
-  // Se recarga al cambiar la sesión: sin token no hay datos que traer.
   useEffect(() => {
     fetchData();
   }, [authToken]);
 
-  // Login success
   const handleLoginSuccess = (user: UserProfile, token: string) => {
     restoredRef.current = true;
     setCurrentUser(user);
@@ -151,19 +144,15 @@ export default function App() {
     setAuthToken(null);
     clearStoredToken();
     localStorage.removeItem(SESSION_KEY);
-    // 🔒 Volver al tab permitido: si estaba en cámara/admin/enrolamiento, quedaría bloqueado.
     setActiveTab('mobile');
     setActiveView('main');
   };
 
-  // 🔑 Se llama después de cambiar la contraseña con éxito.
-  // Cierra la sesión local para forzar el re-login con la nueva contraseña.
   const handlePasswordChanged = () => {
     setIsChangePasswordOpen(false);
     handleLogout();
   };
 
-  // Keeps the session (and Navbar) in sync when the person edits their own profile
   const handleUserUpdated = (user: UserProfile) => {
     setCurrentUser(user);
     try {
@@ -172,12 +161,9 @@ export default function App() {
       if (saved?.token) {
         localStorage.setItem(SESSION_KEY, JSON.stringify({ user, token: saved.token }));
       }
-    } catch {
-      // ignore persistence errors
-    }
+    } catch {}
   };
 
-  // Called whenever the vision camera logs a new entry or exit
   const handleNewAccessLog = (newLog: AccessLog) => {
     setLogs((prev) => [newLog, ...prev]);
     authFetch('/api/stats')
@@ -193,12 +179,8 @@ export default function App() {
       darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'
     }`}>
 
-      {/* 🌊 FONDO RIPPLE (radar cyan) — solo decorativo, no interactuable */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        aria-hidden="true"
-        style={{ backgroundImage: rippleBackground }}
-      />
+      {/* 🚀 FONDO ANIMADO INTERACTIVO DE RED NEURONAL */}
+      <InteractiveBackground darkMode={darkMode} />
 
       {/* Top Navigation */}
       <Navbar
@@ -214,13 +196,13 @@ export default function App() {
         onToggleDarkMode={() => setDarkMode((prev) => !prev)}
         onOpenEditProfile={() => setActiveView('edit-profile')}
         onOpenChangePassword={() => setIsChangePasswordOpen(true)}
+        onOpenSelfEnrollment={() => setActiveView('self-enrollment')}
       />
 
       {/* Main Content Area */}
-      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto p-0 sm:p-0 lg:p-8">
 
         {loading ? (
-          /* ═══════ LOADING STATE con logo SCAI ═══════ */
           <div className="flex flex-col items-center justify-center py-24 gap-6">
             <div className="relative">
               <div className={`absolute inset-0 rounded-full blur-3xl opacity-40 animate-pulse ${
@@ -245,9 +227,6 @@ export default function App() {
             <div className="w-10 h-10 border-3 border-blue-900 border-t-amber-500 rounded-full animate-spin" />
           </div>
         ) : activeView === 'edit-profile' && currentUser ? (
-          /* ═══════════════════════════════════════════════════════════════════
-              VISTA DEDICADA: EDITAR PERFIL
-              ═══════════════════════════════════════════════════════════════════ */
           <EditProfileView
             currentUser={currentUser}
             onCancel={() => setActiveView('main')}
@@ -256,16 +235,20 @@ export default function App() {
             onOpenChangePassword={() => setIsChangePasswordOpen(true)}
             darkMode={darkMode}
           />
+        ) : activeView === 'self-enrollment' && currentUser ? (
+          <SelfEnrollmentView
+            currentUser={currentUser}
+            onCancel={() => setActiveView('main')}
+            onRefresh={fetchData}
+            darkMode={darkMode}
+          />
         ) : (
           <>
-            {/* ═══════════════════════════════════════════════════════════════════
-                VIEW 1: PORTAL PERSONAL
-                ═══════════════════════════════════════════════════════════════════ */}
             {activeTab === 'mobile' && (
               <div className="animate-in fade-in duration-200">
                 {currentUser ? (
-                  <div className="space-y-4">
-                    <div className="text-center max-w-3xl mx-auto mb-4">
+                  <div className="space-y-0 lg:space-y-4">
+                    <div className="text-center max-w-3xl mx-auto mb-4 px-4 pt-4 lg:px-0 lg:pt-0">
                       <span className={`text-[11px] font-mono font-bold uppercase tracking-widest px-3.5 py-1 rounded-full shadow-xs border ${
                         darkMode
                           ? 'bg-amber-950/70 border-amber-800 text-amber-300'
@@ -297,116 +280,207 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  <div className="w-full max-w-7xl mx-auto py-4 lg:py-8">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
+                  <div className="w-full max-w-7xl mx-auto py-6 lg:py-12 px-4 lg:px-0 space-y-10">
+                    
+                    {/* 🌟 HERO PRINCIPAL */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
 
-                      <div className={`flex flex-col p-10 lg:p-14 rounded-3xl border shadow-xl transition-colors backdrop-blur-sm ${
-                        darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'
-                      }`}>
-                        <span className={`self-start inline-block text-[11px] lg:text-xs font-mono font-bold uppercase tracking-widest px-4 py-1.5 rounded-full border mb-6 ${
+                      {/* LADO IZQUIERDO: Presentación e inicio de sesión (7 cols) */}
+                      <div className="lg:col-span-7 space-y-6 sm:space-y-8">
+                        
+                        {/* Pill de estado del sistema */}
+                        <div className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-full border text-xs font-semibold backdrop-blur-md shadow-sm ${
                           darkMode
-                            ? 'bg-blue-950 text-blue-300 border-blue-800'
-                            : 'bg-blue-100 text-blue-900 border-blue-300'
+                            ? 'bg-slate-900/80 border-cyan-500/30 text-cyan-300'
+                            : 'bg-white/80 border-blue-200 text-blue-950'
                         }`}>
-                          Acceso Institucional
-                        </span>
+                          <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500" />
+                          </span>
+                          <span>Visión Artificial Biométrica v3.2</span>
+                          <span className="text-slate-400">•</span>
+                          <span className="font-mono text-[10px] text-amber-500 font-bold">Cra 5 Ibagué</span>
+                        </div>
 
-                        <h1 className={`text-4xl lg:text-5xl xl:text-6xl font-black tracking-tight mb-5 leading-[1.05] ${
-                          darkMode ? 'text-white' : 'text-slate-900'
-                        }`}>
-                          Control de<br className="hidden lg:block" /> Acceso Peatonal
-                        </h1>
-                        <p className={`text-sm lg:text-base leading-relaxed mb-10 max-w-lg ${
-                          darkMode ? 'text-slate-400' : 'text-slate-600'
-                        }`}>
-                          Sistema de reconocimiento facial y gestión de accesos para la sede Ibagué de UNIMINUTO.
-                          Accede con tu cuenta institucional para consultar tu información personal.
-                        </p>
+                        {/* Título de impacto */}
+                        <div className="space-y-4">
+                          <h1 className={`text-4xl sm:text-5xl xl:text-6xl font-black tracking-tight leading-[1.08] ${
+                            darkMode ? 'text-white' : 'text-slate-900'
+                          }`}>
+                            Control de Acceso <br />
+                            <span className="bg-gradient-to-r from-blue-600 via-cyan-500 to-amber-500 bg-clip-text text-transparent">
+                              Peatonal Inteligente
+                            </span>
+                          </h1>
+                          <p className={`text-sm sm:text-base leading-relaxed max-w-xl font-medium ${
+                            darkMode ? 'text-slate-300' : 'text-slate-600'
+                          }`}>
+                            Plataforma centralizada de reconocimiento facial en tiempo real para la sede Ibagué de UNIMINUTO. Seguridad automatizada, control peatonal sin contacto e historial biométrico integrado.
+                          </p>
+                        </div>
 
-                        <div className="mt-auto">
+                        {/* Botones de acción */}
+                        <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                           <button
                             onClick={() => setIsAuthOpen(true)}
-                            className="w-full lg:w-auto lg:min-w-[280px] px-8 py-4 lg:py-5 rounded-2xl bg-blue-900 hover:bg-blue-800 text-white font-black text-sm lg:text-base shadow-lg hover:shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+                            className="group relative flex items-center justify-center gap-3 px-8 py-4.5 rounded-2xl bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-950 hover:from-blue-800 hover:to-indigo-800 text-white font-black text-sm shadow-xl shadow-blue-950/30 transition-all duration-300 active:scale-[0.98] cursor-pointer overflow-hidden"
                           >
-                            <Lock className="w-5 h-5 text-amber-400" />
-                            Iniciar Sesión Institucional
+                            <div className="absolute inset-0 w-1/2 h-full bg-white/10 skew-x-12 -translate-x-full group-hover:translate-x-[300%] transition-transform duration-1000" />
+                            <Lock className="w-5 h-5 text-amber-400 group-hover:rotate-12 transition-transform" />
+                            <span>Iniciar Sesión Institucional</span>
                           </button>
 
-                          <p className={`text-xs lg:text-sm mt-5 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                            ¿No tienes cuenta?{' '}
-                            <button
-                              onClick={() => setIsAuthOpen(true)}
-                              className={`font-bold underline transition-colors ${
-                                darkMode ? 'text-amber-400 hover:text-amber-300' : 'text-blue-900 hover:text-blue-700'
-                              }`}
-                            >
-                              Regístrate aquí
-                            </button>
-                          </p>
+                          <button
+                            onClick={() => setIsAuthOpen(true)}
+                            className={`flex items-center justify-center gap-2 px-6 py-4.5 rounded-2xl border text-xs font-bold transition-all ${
+                              darkMode
+                                ? 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white'
+                                : 'bg-white/80 border-slate-200 text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>¿No tienes cuenta?</span>
+                            <span className="text-amber-500 font-black underline">Regístrate</span>
+                          </button>
+                        </div>
+
+                        {/* KPIs / Métricas Rápidas */}
+                        <div className="grid grid-cols-3 gap-3.5 pt-6 border-t border-slate-200/20">
+                          <div className={`p-4 rounded-2xl border backdrop-blur-sm ${darkMode ? 'bg-slate-900/40 border-slate-800/80' : 'bg-white/60 border-slate-200/80'}`}>
+                            <p className="text-lg sm:text-2xl font-black text-cyan-400 font-mono">&lt; 500ms</p>
+                            <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Tasa de Respuesta</p>
+                          </div>
+
+                          <div className={`p-4 rounded-2xl border backdrop-blur-sm ${darkMode ? 'bg-slate-900/40 border-slate-800/80' : 'bg-white/60 border-slate-200/80'}`}>
+                            <p className="text-lg sm:text-2xl font-black text-amber-400 font-mono">99.8%</p>
+                            <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Precisión Facial</p>
+                          </div>
+
+                          <div className={`p-4 rounded-2xl border backdrop-blur-sm ${darkMode ? 'bg-slate-900/40 border-slate-800/80' : 'bg-white/60 border-slate-200/80'}`}>
+                            <p className="text-lg sm:text-2xl font-black text-emerald-400 font-mono">100%</p>
+                            <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sin Contacto</p>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* LADO DERECHO: Capacidades del Sistema (5 cols) */}
+                      <div className="lg:col-span-5 relative">
+                        <div className={`relative p-6 sm:p-8 rounded-3xl border shadow-2xl overflow-hidden backdrop-blur-md transition-all ${
+                          darkMode
+                            ? 'bg-slate-900/80 border-slate-800 shadow-cyan-950/20'
+                            : 'bg-white/90 border-slate-200 shadow-blue-900/10'
+                        }`}>
+                          
+                          <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-200/20">
+                            <h3 className={`text-xs font-black uppercase tracking-wider flex items-center gap-2 ${
+                              darkMode ? 'text-white' : 'text-slate-900'
+                            }`}>
+                              <Sparkles className="w-4 h-4 text-amber-500" />
+                              Capacidades del Sistema
+                            </h3>
+                            <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                              AI ACTIVE
+                            </span>
+                          </div>
+
+                          {/* Lista de Características con Iconografía Vistosa */}
+                          <div className="space-y-4">
+                            {[
+                              { icon: Sparkles, title: 'Acceso Manos Libres', desc: 'Apertura automática de torniquetes mediante detección facial en la entrada peatonal.', color: 'emerald' },
+                              { icon: Smartphone, title: 'Carné Digital Dinámico', desc: 'Visualiza tus datos institucionales, vigencia y código QR seguro desde cualquier dispositivo.', color: 'blue' },
+                              { icon: Clock, title: 'Historial de Accesos', desc: 'Auditoría detallada con timestamps, torniquete asignado y nivel de confianza biométrica.', color: 'amber' },
+                              { icon: Camera, title: 'Enrolamiento Biométrico', desc: 'Registro único y seguro con consentimiento de tratamiento de datos personales.', color: 'violet' },
+                            ].map((feature) => {
+                              const Icon = feature.icon;
+                              return (
+                                <div
+                                  key={feature.title}
+                                  className={`p-4 rounded-2xl border transition-all duration-200 hover:scale-[1.02] flex items-start gap-4 ${
+                                    darkMode
+                                      ? 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
+                                      : 'bg-slate-50/80 border-slate-200/80 hover:border-slate-300'
+                                  }`}
+                                >
+                                  <div className={`shrink-0 w-11 h-11 rounded-xl flex items-center justify-center border ${
+                                    darkMode
+                                      ? `bg-${feature.color}-950/80 text-${feature.color}-400 border-${feature.color}-800/80`
+                                      : `bg-${feature.color}-50 text-${feature.color}-600 border-${feature.color}-200`
+                                  }`}>
+                                    <Icon className="w-5 h-5" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className={`text-xs sm:text-sm font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                      {feature.title}
+                                    </h4>
+                                    <p className={`text-xs mt-0.5 leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                      {feature.desc}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
                         </div>
                       </div>
 
-                      <div className={`flex flex-col p-10 lg:p-14 rounded-3xl border shadow-xl transition-colors backdrop-blur-sm ${
-                        darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'
-                      }`}>
-                        <h2 className={`text-2xl lg:text-3xl font-black mb-2 ${
-                          darkMode ? 'text-white' : 'text-slate-900'
-                        }`}>
-                          ¿Qué puedes hacer?
-                        </h2>
-                        <p className={`text-xs lg:text-sm mb-8 ${
-                          darkMode ? 'text-slate-400' : 'text-slate-500'
-                        }`}>
-                          Con tu cuenta institucional UNIMINUTO
-                        </p>
+                    </div>
 
-                        <div className="space-y-6 lg:space-y-7">
-                          {[
-                            { icon: Sparkles, title: 'Acceso manos libres', desc: 'Ingresa y sal del campus con reconocimiento facial en los torniquetes peatonales de la Cra 5.', color: 'emerald' },
-                            { icon: Smartphone, title: 'Carné digital institucional', desc: 'Lleva tu carné UNIMINUTO siempre contigo con tu foto, código QR y datos de vigencia.', color: 'blue' },
-                            { icon: Clock, title: 'Historial de accesos', desc: 'Consulta cada entrada y salida del campus con fecha, hora, torniquete y certeza del reconocimiento.', color: 'amber' },
-                            { icon: Camera, title: 'Enrolamiento biométrico', desc: 'Registra tu rostro una sola vez y habilita el acceso sin contacto con consentimiento informado.', color: 'violet' },
-                          ].map((feature) => {
-                            const Icon = feature.icon;
-                            return (
-                              <div key={feature.title} className="flex items-start gap-4 lg:gap-5">
-                                <div className={`shrink-0 w-12 h-12 lg:w-14 lg:h-14 rounded-2xl flex items-center justify-center border ${
-                                  darkMode
-                                    ? `bg-${feature.color}-950 text-${feature.color}-300 border-${feature.color}-800`
-                                    : `bg-${feature.color}-50 text-${feature.color}-700 border-${feature.color}-200`
-                                }`}>
-                                  <Icon className="w-5 h-5 lg:w-6 lg:h-6" />
-                                </div>
-                                <div className="flex-1 pt-0.5">
-                                  <h3 className={`text-sm lg:text-base font-black mb-1 ${
-                                    darkMode ? 'text-white' : 'text-slate-900'
-                                  }`}>
-                                    {feature.title}
-                                  </h3>
-                                  <p className={`text-xs lg:text-sm leading-relaxed ${
-                                    darkMode ? 'text-slate-400' : 'text-slate-600'
-                                  }`}>
-                                    {feature.desc}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                    {/* 🛠️ PASOS RÁPIDOS PARA INGRESO AL CAMPUS */}
+                    <div className={`p-6 sm:p-8 rounded-3xl border shadow-xl backdrop-blur-md transition-colors ${
+                      darkMode ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white/80 border-slate-200/80'
+                    }`}>
+                      <div className="text-center max-w-xl mx-auto mb-6">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-500">
+                          Proceso Simple
+                        </span>
+                        <h2 className={`text-xl sm:text-2xl font-black mt-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          ¿Cómo ingresar al campus?
+                        </h2>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+                        {[
+                          { step: '01', title: 'Inicia Sesión', desc: 'Usa tu correo institucional UNIMINUTO para autenticarte.' },
+                          { step: '02', title: 'Enrola tu Rostro', desc: 'Registra tu perfil biométrico una única vez desde el portal.' },
+                          { step: '03', title: 'Acceso Manos Libres', desc: 'Pasa por los torniquetes peatonales de la Cra 5 sin contacto.' },
+                        ].map((item, idx) => (
+                          <div
+                            key={item.step}
+                            className={`p-5 rounded-2xl border relative flex flex-col justify-between ${
+                              darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-2xl font-black font-mono text-cyan-500">{item.step}</span>
+                              <CheckCircle2 className="w-5 h-5 text-amber-500" />
+                            </div>
+                            <div>
+                              <h3 className={`text-sm font-black mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {item.title}
+                              </h3>
+                              <p className={`text-xs leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                {item.desc}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
-                    <div className={`mt-10 p-5 lg:p-6 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs lg:text-sm backdrop-blur-sm ${
-                      darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'
+                    {/* Banner Inferior Informativo */}
+                    <div className={`p-4 sm:p-5 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs backdrop-blur-md ${
+                      darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-200'
                     }`}>
                       <div className="flex items-center gap-3">
                         <span className="w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 animate-pulse" />
                         <span className={`font-black ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                          Sistema operativo
+                          Nodo Central Operativo
                         </span>
-                        <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>•</span>
+                        <span className={darkMode ? 'text-slate-600' : 'text-slate-300'}>•</span>
                         <span className={`font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Sede Ibagué, Tolima
+                          Sede Principal Ibagué, Tolima
                         </span>
                       </div>
 
@@ -414,7 +488,7 @@ export default function App() {
                         <img
                           src={scaiLogo}
                           alt="SCAI Horizon"
-                          className="w-8 h-8 object-contain opacity-90"
+                          className="w-7 h-7 object-contain opacity-90"
                         />
                         <span className={`font-mono font-bold ${
                           darkMode ? 'text-slate-500' : 'text-slate-400'
@@ -423,16 +497,14 @@ export default function App() {
                         </span>
                       </div>
                     </div>
+
                   </div>
                 )}
               </div>
             )}
 
-            {/* ═══════════════════════════════════════════════════════════════════
-                VIEW 2: CÁMARA
-                ═══════════════════════════════════════════════════════════════════ */}
             {activeTab === 'camera' && (
-              <div className="animate-in fade-in duration-200">
+              <div className="animate-in fade-in duration-200 px-4 lg:px-0 pt-4 lg:pt-0">
                 <div className={`mb-4 p-4 rounded-2xl border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors backdrop-blur-sm ${
                   darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'
                 }`}>
@@ -483,12 +555,8 @@ export default function App() {
               </div>
             )}
 
-            {/* ═══════════════════════════════════════════════════════════════════
-                VIEW 3: ENROLAMIENTO FACIAL
-                Solo para admin/security
-                ═══════════════════════════════════════════════════════════════════ */}
             {activeTab === 'enrollment' && (
-              <div className="animate-in fade-in duration-200">
+              <div className="animate-in fade-in duration-200 px-4 lg:px-0 pt-4 lg:pt-0">
                 {currentUser && (currentUser.role === 'admin' || currentUser.role === 'security') ? (
                   <FaceEnrollmentView
                     users={users}
@@ -517,12 +585,8 @@ export default function App() {
               </div>
             )}
 
-            {/* ═══════════════════════════════════════════════════════════════════
-                VIEW 4: PANEL DE ADMINISTRACIÓN
-                Solo para admin/security
-                ═══════════════════════════════════════════════════════════════════ */}
             {activeTab === 'admin' && (
-              <div className="animate-in fade-in duration-200">
+              <div className="animate-in fade-in duration-200 px-4 lg:px-0 pt-4 lg:pt-0">
                 {currentUser && (currentUser.role === 'admin' || currentUser.role === 'security') ? (
                   <AdminDashboard
                     users={users}

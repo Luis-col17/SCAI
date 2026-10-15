@@ -21,14 +21,16 @@ import {
   Shield,
   AlertCircle,
   User as UserIcon,
+  Sparkles,
+  Flame,
+  Award,
+  Zap,
+  Activity,
 } from 'lucide-react';
-import type { UserProfile, AccessLog, UserRole } from '../types.ts';
-import { getStoredToken, AVATAR_FALLBACK } from '../lib/api.ts';
-import { AvatarModal } from './AvatarModal.tsx';
+import type { UserProfile, AccessLog, UserRole } from '../types';
+import { getStoredToken, AVATAR_FALLBACK } from '../lib/api';
+import { AvatarModal } from './AvatarModal';
 
-// 🔒 Feature flags — activar cuando el feature esté 100% probado
-// Ubicación de docentes/administrativos: deshabilitado temporalmente.
-// Para reactivar: cambiar a `true`. El código queda intacto.
 const ENABLE_SEARCH_LOCATION = false;
 
 interface WebAppViewProps {
@@ -78,7 +80,6 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
   const [avatarNotice, setAvatarNotice] = useState<string | null>(null);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
 
-  // Búsqueda de personas (solo se usa si ENABLE_SEARCH_LOCATION = true)
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -114,7 +115,6 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
     loadUserData();
   }, [currentUser.id]);
 
-  // Debounce de búsqueda (solo activo si ENABLE_SEARCH_LOCATION = true)
   useEffect(() => {
     if (!ENABLE_SEARCH_LOCATION) return;
 
@@ -170,7 +170,6 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
     }
   };
 
-  // --- CÁLCULOS DE KPIs ---
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -180,7 +179,6 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
   const lastLog = logs[0];
   const isInside = lastLog?.direction === 'entry' && lastLog?.status === 'authorized';
 
-  // Promedio de hora de entrada (últimas entradas autorizadas)
   const entryLogs = logs
     .filter((l) => l.direction === 'entry' && l.status === 'authorized')
     .slice(0, 30);
@@ -197,7 +195,6 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
     avgEntryHour = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
 
-  // Racha de días consecutivos asistiendo
   const uniqueDays = Array.from(
     new Set(
       logs
@@ -224,90 +221,100 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
   });
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      {/* ================== FILA DE KPIs ================== */}
+    <div className="max-w-7xl mx-auto space-y-6 pb-12 px-2 sm:px-4 animate-fade-in">
+      {/* ================== TARJETAS KPI ================== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Accesos del mes */}
         <div
-          className={`p-5 rounded-2xl border shadow-sm transition-colors ${
-            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          className={`relative group overflow-hidden p-5 rounded-2xl border transition-all hover:-translate-y-1 ${
+            darkMode
+              ? 'bg-slate-900/90 border-slate-800 shadow-lg shadow-blue-950/20'
+              : 'bg-white/90 backdrop-blur-md border-slate-200/80 shadow-sm hover:shadow-md'
           }`}
         >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/20 transition-all" />
           <div className="flex items-center justify-between mb-3">
             <span className={`text-[11px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
               Accesos este mes
             </span>
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${darkMode ? 'bg-blue-950 text-blue-300' : 'bg-blue-50 text-blue-900'}`}>
-              <TrendingUp className="w-4 h-4" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-xs ${darkMode ? 'bg-blue-950 text-blue-400 border border-blue-800' : 'bg-blue-50 text-blue-900 border border-blue-100'}`}>
+              <TrendingUp className="w-5 h-5" />
             </div>
           </div>
-          <p className={`text-3xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            {logsThisMonth.length}
-          </p>
+          <div className="flex items-baseline gap-2">
+            <p className={`text-3xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              {logsThisMonth.length}
+            </p>
+            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">eventos</span>
+          </div>
           <p className={`text-[11px] mt-1 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            Total de eventos registrados
+            Bitácora mensual registrada
           </p>
         </div>
 
         {/* KPI 2: Accesos de hoy */}
         <div
-          className={`p-5 rounded-2xl border shadow-sm transition-colors ${
-            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          className={`relative group overflow-hidden p-5 rounded-2xl border transition-all hover:-translate-y-1 ${
+            darkMode
+              ? 'bg-slate-900/90 border-slate-800 shadow-lg shadow-amber-950/20'
+              : 'bg-white/90 backdrop-blur-md border-slate-200/80 shadow-sm hover:shadow-md'
           }`}
         >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/20 transition-all" />
           <div className="flex items-center justify-between mb-3">
             <span className={`text-[11px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Hoy
+              Accesos de hoy
             </span>
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${darkMode ? 'bg-amber-950 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
-              <Clock className="w-4 h-4" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-xs ${darkMode ? 'bg-amber-950 text-amber-400 border border-amber-800' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
+              <Clock className="w-5 h-5" />
             </div>
           </div>
-          <p className={`text-3xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            {logsToday.length}
-          </p>
+          <div className="flex items-baseline gap-2">
+            <p className={`text-3xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              {logsToday.length}
+            </p>
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-400">eventos</span>
+          </div>
           <p className={`text-[11px] mt-1 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            {logsToday.length === 0 ? 'Sin eventos hoy' : 'Eventos registrados hoy'}
+            {logsToday.length === 0 ? 'Sin registros hoy' : 'Movimientos activos hoy'}
           </p>
         </div>
 
         {/* KPI 3: Estado actual */}
         <div
-          className={`p-5 rounded-2xl border shadow-sm transition-colors ${
-            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          className={`relative group overflow-hidden p-5 rounded-2xl border transition-all hover:-translate-y-1 ${
+            darkMode
+              ? 'bg-slate-900/90 border-slate-800 shadow-lg'
+              : 'bg-white/90 backdrop-blur-md border-slate-200/80 shadow-sm hover:shadow-md'
           }`}
         >
+          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-xl transition-all ${isInside ? 'bg-emerald-500/15 group-hover:bg-emerald-500/25' : 'bg-slate-500/10'}`} />
           <div className="flex items-center justify-between mb-3">
             <span className={`text-[11px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Estado actual
+              Ubicación Actual
             </span>
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                isInside
-                  ? darkMode
-                    ? 'bg-emerald-950 text-emerald-300'
-                    : 'bg-emerald-50 text-emerald-700'
-                  : darkMode
-                    ? 'bg-slate-800 text-slate-400'
-                    : 'bg-slate-100 text-slate-500'
-              }`}
-            >
-              <Building2 className="w-4 h-4" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-xs ${
+              isInside
+                ? darkMode
+                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : darkMode
+                  ? 'bg-slate-800 text-slate-400'
+                  : 'bg-slate-100 text-slate-500'
+            }`}>
+              <Building2 className="w-5 h-5" />
             </div>
           </div>
-          <p
-            className={`text-2xl font-black flex items-center gap-2 ${
-              isInside
-                ? 'text-emerald-500'
-                : darkMode
-                  ? 'text-slate-300'
-                  : 'text-slate-700'
-            }`}
-          >
-            <span className={`w-2.5 h-2.5 rounded-full ${isInside ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-            {isInside ? 'En el campus' : 'Fuera'}
-          </p>
-          <p className={`text-[11px] mt-1 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-3 w-3">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isInside ? 'bg-emerald-400' : 'bg-slate-400'}`} />
+              <span className={`relative inline-flex rounded-full h-3 w-3 ${isInside ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+            </span>
+            <p className={`text-2xl font-black tracking-tight ${isInside ? 'text-emerald-600 dark:text-emerald-400' : darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              {isInside ? 'En Campus' : 'Fuera'}
+            </p>
+          </div>
+          <p className={`text-[11px] mt-1 font-medium truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             {lastLog
               ? `Último: ${new Date(lastLog.timestamp).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}`
               : 'Sin registros'}
@@ -316,434 +323,318 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
 
         {/* KPI 4: Biometría */}
         <div
-          className={`p-5 rounded-2xl border shadow-sm transition-colors ${
-            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          className={`relative group overflow-hidden p-5 rounded-2xl border transition-all hover:-translate-y-1 ${
+            darkMode
+              ? 'bg-slate-900/90 border-slate-800 shadow-lg shadow-violet-950/20'
+              : 'bg-white/90 backdrop-blur-md border-slate-200/80 shadow-sm hover:shadow-md'
           }`}
         >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-full blur-xl group-hover:bg-violet-500/20 transition-all" />
           <div className="flex items-center justify-between mb-3">
             <span className={`text-[11px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Biometría facial
+              Biometría Facial IA
             </span>
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${darkMode ? 'bg-violet-950 text-violet-300' : 'bg-violet-50 text-violet-700'}`}>
-              <Shield className="w-4 h-4" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-xs ${darkMode ? 'bg-violet-950 text-violet-400 border border-violet-800' : 'bg-violet-50 text-violet-700 border border-violet-100'}`}>
+              <Shield className="w-5 h-5" />
             </div>
           </div>
-          <p className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          <p className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
             {currentUser.faceEnrolled ? 'Activa' : 'Pendiente'}
           </p>
           <p className={`text-[11px] mt-1 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             {currentUser.faceEnrolled
-              ? 'Acceso manos libres habilitado'
-              : 'Aún no has enrolado tu rostro'}
+              ? 'Acceso sin contacto habilitado'
+              : 'Enrola tu rostro para ingreso directo'}
           </p>
         </div>
       </div>
 
-      {/* ================== FILA: CARNÉ + PERFIL ================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Carné digital (2 columnas) */}
+      {/* ================== CARNÉ HOLOGRÁFICO + ESTADÍSTICAS ================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* CARNÉ DIGITAL TIPO CREDENCIAL */}
         <div
-          className={`lg:col-span-2 p-6 rounded-2xl border shadow-sm transition-colors ${
-            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          className={`lg:col-span-2 rounded-3xl border shadow-lg transition-all overflow-hidden flex flex-col justify-between relative ${
+            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/90'
           }`}
         >
-          <div className="flex items-center gap-2 mb-4">
-            <IdCard className={`w-5 h-5 ${darkMode ? 'text-amber-400' : 'text-blue-900'}`} />
-            <h3 className={`text-sm font-black uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Carné Digital
-            </h3>
+          {/* Encabezado Institucional Uniminuto */}
+          <div className="relative bg-gradient-to-r from-blue-950 via-blue-900 to-indigo-900 px-6 py-4 flex items-center justify-between text-white overflow-hidden shadow-inner">
+            <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl" />
+            <div className="flex items-center gap-3 relative z-10">
+              <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center shadow-xs">
+                <GraduationCap className="w-5 h-5 text-amber-300" />
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-widest text-amber-300">
+                  UNIMINUTO · Ibagué
+                </h4>
+                <p className="text-[10px] text-blue-200 font-semibold tracking-wider uppercase">Carné Institucional Digital</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 relative z-10">
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Live Sync
+              </span>
+            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-5">
-            {/* Foto */}
-            <div className="shrink-0 flex flex-col items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setShowAvatarModal(true)}
-                disabled={avatarUploading}
-                className={`relative w-32 h-40 rounded-xl overflow-hidden border-2 border-blue-900 shadow-md transition-all ${
-                  avatarUploading ? 'opacity-60 cursor-wait' : 'cursor-pointer hover:opacity-85'
-                }`}
-              >
-                <img
-                  src={avatarUrl || AVATAR_FALLBACK}
-                  alt={currentUser.name}
-                  className="w-full h-full object-cover"
-                />
-                {avatarUploading && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-slate-900/55">
-                    <RefreshCw className="w-6 h-6 text-amber-400 animate-spin" />
-                  </span>
-                )}
-              </button>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setShowAvatarModal(true)}
-                  disabled={avatarUploading}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border transition-colors disabled:opacity-50 ${
-                    darkMode
-                      ? 'bg-amber-950 text-amber-300 border-amber-800 hover:bg-amber-900'
-                      : 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
-                  }`}
-                >
-                  <Camera className="w-3 h-3" />
-                  {avatarUrl ? 'Cambiar' : 'Subir'}
-                </button>
-                {avatarUrl && (
+          {/* Cuerpo del Carné */}
+          <div className="p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
+              
+              {/* Foto de Perfil */}
+              <div className="shrink-0 flex flex-col items-center gap-3">
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 to-blue-600 rounded-3xl blur-xs opacity-70 group-hover:opacity-100 transition duration-300" />
                   <button
                     type="button"
-                    onClick={handleAvatarRemoved}
+                    onClick={() => setShowAvatarModal(true)}
                     disabled={avatarUploading}
-                    className={`p-1.5 rounded-lg border transition-colors disabled:opacity-50 ${
-                      darkMode
-                        ? 'bg-rose-950 text-rose-300 border-rose-800 hover:bg-rose-900'
-                        : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'
+                    className={`relative w-36 h-44 rounded-2xl overflow-hidden border-2 border-white dark:border-slate-800 shadow-md transition-all ${
+                      avatarUploading ? 'opacity-60 cursor-wait' : 'cursor-pointer hover:scale-[1.02]'
                     }`}
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <img
+                      src={avatarUrl || AVATAR_FALLBACK}
+                      alt={currentUser.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {avatarUploading && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs">
+                        <RefreshCw className="w-7 h-7 text-amber-400 animate-spin" />
+                      </span>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs font-bold gap-1">
+                      <Camera className="w-5 h-5" />
+                      <span>Cambiar foto</span>
+                    </div>
                   </button>
-                )}
-              </div>
-            </div>
+                </div>
 
-            {/* Info */}
-            <div className="flex-1 space-y-3">
-              <div>
-                <h2 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {currentUser.name}
-                </h2>
-                <p className={`text-sm font-mono font-bold mt-0.5 ${darkMode ? 'text-amber-400' : 'text-blue-900'}`}>
-                  CC: {currentUser.documentId}
-                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAvatarModal(true)}
+                    disabled={avatarUploading}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                      darkMode
+                        ? 'bg-blue-900/40 text-blue-300 border border-blue-700/60 hover:bg-blue-800/60'
+                        : 'bg-blue-50 text-blue-950 border border-blue-200 hover:bg-blue-100'
+                    }`}
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    {avatarUrl ? 'Editar' : 'Subir'}
+                  </button>
+                  {avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={handleAvatarRemoved}
+                      disabled={avatarUploading}
+                      title="Quitar foto"
+                      className={`p-1.5 rounded-xl border transition-colors ${
+                        darkMode
+                          ? 'bg-rose-950/50 text-rose-300 border-rose-800/60 hover:bg-rose-900'
+                          : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'
+                      }`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <span
-                  className={`inline-flex items-center gap-1 text-[11px] font-black uppercase px-2.5 py-1 rounded-lg border ${
+              {/* Información Personal */}
+              <div className="flex-1 space-y-4 text-center sm:text-left w-full">
+                <div>
+                  <h2 className={`text-2xl sm:text-3xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    {currentUser.name}
+                  </h2>
+                  <p className={`text-sm font-mono font-bold mt-1 flex items-center justify-center sm:justify-start gap-1.5 ${darkMode ? 'text-amber-400' : 'text-blue-900'}`}>
+                    <IdCard className="w-4 h-4" /> CC: {currentUser.documentId}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap justify-center sm:justify-start gap-2">
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-black uppercase px-3 py-1 rounded-xl border ${
                     darkMode
-                      ? 'bg-amber-950 text-amber-300 border-amber-800'
-                      : 'bg-amber-100 text-amber-900 border-amber-300'
-                  }`}
-                >
-                  <UserIcon className="w-3 h-3" />
-                  {roleLabel[currentUser.role] || currentUser.role}
-                </span>
-                <span
-                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
+                      ? 'bg-amber-950/60 text-amber-300 border-amber-800'
+                      : 'bg-amber-50 text-amber-900 border-amber-300'
+                  }`}>
+                    <UserIcon className="w-3.5 h-3.5" />
+                    {roleLabel[currentUser.role] || currentUser.role}
+                  </span>
+
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-xl border ${
                     darkMode
-                      ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                      : 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                  }`}
-                >
-                  <CheckCircle2 className="w-3 h-3" />
-                  Activo
-                </span>
-              </div>
+                      ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  }`}>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    Activo
+                  </span>
+                </div>
 
-              <div className={`pt-3 border-t space-y-1.5 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                <p className={`flex items-center gap-2 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <GraduationCap className="w-4 h-4 text-slate-400" />
-                  {currentUser.facultyOrDept || 'Comunidad universitaria'}
-                </p>
-                <p className={`flex items-center gap-2 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <Mail className="w-4 h-4 text-slate-400" />
-                  {currentUser.email}
-                </p>
-              </div>
+                <div className={`pt-3 border-t space-y-2 ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                  <p className={`flex items-center justify-center sm:justify-start gap-2 text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                    <GraduationCap className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>{currentUser.facultyOrDept || 'Comunidad Universitaria'}</span>
+                  </p>
+                  <p className={`flex items-center justify-center sm:justify-start gap-2 text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                    <Mail className="w-4 h-4 text-blue-500 shrink-0" />
+                    <span>{currentUser.email}</span>
+                  </p>
+                </div>
 
-              {/* QR */}
-              <div
-                className={`p-3 rounded-xl border flex items-center justify-between gap-3 mt-3 ${
-                  darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <QrCode className={`w-10 h-10 ${darkMode ? 'text-amber-400' : 'text-blue-950'}`} />
-                  <div>
-                    <span className={`text-[10px] font-mono block font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Código QR Peatonal
-                    </span>
-                    <span className={`text-sm font-mono font-black ${darkMode ? 'text-amber-300' : 'text-blue-950'}`}>
-                      UNI-{currentUser.documentId.slice(-6)}
-                    </span>
+                {/* Contenedor QR y Chip RFID */}
+                <div className={`p-4 rounded-2xl border flex items-center justify-between gap-4 mt-2 ${
+                  darkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-white rounded-xl shadow-xs border border-slate-200">
+                      <QrCode className="w-7 h-7 text-blue-950" />
+                    </div>
+                    <div>
+                      <span className={`text-[10px] font-extrabold uppercase tracking-widest block ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Pase Peatonal QR
+                      </span>
+                      <span className={`text-sm sm:text-base font-mono font-black ${darkMode ? 'text-amber-300' : 'text-blue-950'}`}>
+                        UNI-{currentUser.documentId.slice(-6)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Chip NFC */}
+                  <div className="hidden sm:flex items-center gap-1.5 bg-gradient-to-br from-amber-200 to-amber-400 p-2 rounded-lg border border-amber-500/40 shadow-xs">
+                    <Zap className="w-4 h-4 text-amber-900" />
+                    <span className="text-[9px] font-black uppercase tracking-wider text-amber-950">NFC Ready</span>
                   </div>
                 </div>
-                <div className="h-8 flex items-center gap-0.5 opacity-60">
-                  {Array.from({ length: 24 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={darkMode ? 'bg-slate-400 h-full' : 'bg-slate-700 h-full'}
-                      style={{ width: i % 3 === 0 ? '3px' : '1.5px' }}
-                    />
-                  ))}
-                </div>
+
               </div>
             </div>
           </div>
         </div>
 
-        {/* Mi actividad */}
+        {/* MI ACTIVIDAD */}
         <div
-          className={`p-6 rounded-2xl border shadow-sm transition-colors ${
-            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          className={`p-6 rounded-3xl border shadow-lg flex flex-col justify-between ${
+            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/90'
           }`}
         >
-          <h3 className={`text-sm font-black uppercase tracking-wider mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            Mi actividad
-          </h3>
-
-          <div className="space-y-4">
-            {/* Promedio de hora de entrada */}
-            <div>
-              <p className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Promedio de entrada
-              </p>
-              <p className={`text-3xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                {avgEntryHour}
-              </p>
-              <p className={`text-[11px] font-medium mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Basado en tus últimas {entryLogs.length} entradas
-              </p>
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-amber-500" />
+                <h3 className={`text-xs font-black uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  Mi Actividad
+                </h3>
+              </div>
+              <Sparkles className="w-4 h-4 text-amber-400" />
             </div>
 
-            {/* Racha */}
-            <div className={`pt-4 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-              <p className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Racha de asistencia
-              </p>
-              <p className={`text-3xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                {streak} {streak === 1 ? 'día' : 'días'}
-              </p>
-              <p className={`text-[11px] font-medium mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Días consecutivos entrando al campus
-              </p>
-            </div>
-
-            {/* Última ubicación */}
-            <div className={`pt-4 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-              <p className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Mi última ubicación
-              </p>
-              {lastLog ? (
-                <>
-                  <p className={`flex items-center gap-1.5 text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
-                    {lastLog.entryPoint}
-                  </p>
-                  <p className={`text-[11px] font-medium mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {new Date(lastLog.timestamp).toLocaleString('es-CO', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
-                  </p>
-                </>
-              ) : (
-                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Sin registros aún
+            <div className="space-y-4">
+              {/* Hora Promedio */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-100'
+              }`}>
+                <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Promedio de Entrada
                 </p>
-              )}
+                <p className={`text-3xl font-black ${darkMode ? 'text-amber-300' : 'text-blue-950'}`}>
+                  {avgEntryHour}
+                </p>
+                <p className={`text-[10px] font-semibold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Basado en las últimas {entryLogs.length} asistencias
+                </p>
+              </div>
+
+              {/* Racha */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-100'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <p className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Racha de Asistencia
+                  </p>
+                  <Flame className="w-5 h-5 text-amber-500 animate-bounce" />
+                </div>
+                <p className={`text-3xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  {streak} {streak === 1 ? 'Día' : 'Días'}
+                </p>
+                <p className={`text-[10px] font-semibold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Días consecutivos ingresando
+                </p>
+              </div>
+
+              {/* Última ubicación */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-100'
+              }`}>
+                <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Última Ubicación
+                </p>
+                {lastLog ? (
+                  <>
+                    <p className={`flex items-center gap-1.5 text-xs font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      {lastLog.entryPoint}
+                    </p>
+                    <p className={`text-[10px] font-medium mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {new Date(lastLog.timestamp).toLocaleString('es-CO', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      })}
+                    </p>
+                  </>
+                ) : (
+                  <p className={`text-xs italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Sin accesos registrados
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* ================== BUSCADOR DE PERSONAL ================== */}
-      {/* 🔒 DESHABILITADO — cambiar ENABLE_SEARCH_LOCATION a true para reactivar */}
-      {ENABLE_SEARCH_LOCATION && (
-        <div
-          className={`p-6 rounded-2xl border shadow-sm transition-colors ${
-            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <Search className={`w-5 h-5 ${darkMode ? 'text-amber-400' : 'text-blue-900'}`} />
-            <h3 className={`text-sm font-black uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Ubicar docente o administrativo
-            </h3>
-          </div>
-          <p className={`text-[11px] mb-4 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            Busca por nombre o cédula para conocer la última ubicación registrada. Por privacidad, solo puedes consultar a docentes, personal administrativo, coordinadores y vigilancia.
-          </p>
-
-          <div className="relative mb-4">
-            <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Ej: Juan Pérez, o 1005892341"
-              className={`w-full pl-9 pr-3 py-3 border rounded-xl text-sm focus:outline-hidden ${
-                darkMode
-                  ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-blue-500'
-                  : 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-900'
-              }`}
-            />
-            {searching && (
-              <RefreshCw className="w-4 h-4 absolute right-3 top-3.5 text-amber-500 animate-spin" />
-            )}
-          </div>
-
-          {searchError && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-300 flex items-start gap-2 text-xs text-rose-800 font-medium">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
-              <span>{searchError}</span>
-            </div>
-          )}
-
-          {hasSearched && !searching && searchResults.length === 0 && !searchError && (
-            <p className={`text-sm text-center py-6 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Sin resultados para "{searchQuery}"
-            </p>
-          )}
-
-          {searchResults.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {searchResults.map((r) => {
-                const statusColor =
-                  r.inferredStatus === 'inside'
-                    ? 'emerald'
-                    : r.inferredStatus === 'outside'
-                      ? 'slate'
-                      : 'amber';
-                const statusLabel =
-                  r.inferredStatus === 'inside'
-                    ? 'Probablemente en el campus'
-                    : r.inferredStatus === 'outside'
-                      ? 'Probablemente fuera'
-                      : 'Sin información reciente';
-
-                return (
-                  <div
-                    key={r.id}
-                    className={`p-4 rounded-xl border transition-colors ${
-                      darkMode
-                        ? 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                        : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <img
-                        src={r.avatarUrl || AVATAR_FALLBACK}
-                        alt={r.name}
-                        className="w-12 h-12 rounded-lg object-cover border-2 border-blue-900 shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h4 className={`text-sm font-black truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                          {r.name}
-                        </h4>
-                        <p className={`text-[11px] font-bold ${darkMode ? 'text-amber-400' : 'text-blue-900'}`}>
-                          {roleLabel[r.role] || r.role}
-                        </p>
-                        {r.facultyOrDept && (
-                          <p className={`text-[11px] truncate ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            {r.facultyOrDept}
-                          </p>
-                        )}
-
-                        <div className="mt-2 space-y-1">
-                          <p
-                            className={`inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded ${
-                              statusColor === 'emerald'
-                                ? darkMode
-                                  ? 'bg-emerald-950 text-emerald-300'
-                                  : 'bg-emerald-100 text-emerald-800'
-                                : statusColor === 'amber'
-                                  ? darkMode
-                                    ? 'bg-amber-950 text-amber-300'
-                                    : 'bg-amber-100 text-amber-800'
-                                  : darkMode
-                                    ? 'bg-slate-800 text-slate-300'
-                                    : 'bg-slate-200 text-slate-700'
-                            }`}
-                          >
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${
-                                statusColor === 'emerald'
-                                  ? 'bg-emerald-500'
-                                  : statusColor === 'amber'
-                                    ? 'bg-amber-500'
-                                    : 'bg-slate-400'
-                              }`}
-                            />
-                            {statusLabel}
-                          </p>
-
-                          {r.lastLocation && (
-                            <p className={`flex items-center gap-1 text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                              <MapPin className="w-3 h-3 shrink-0" />
-                              {r.lastLocation}
-                            </p>
-                          )}
-                          {r.lastTimestamp && (
-                            <p className={`flex items-center gap-1 text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                              <Clock className="w-3 h-3 shrink-0" />
-                              {new Date(r.lastTimestamp).toLocaleString('es-CO', {
-                                dateStyle: 'short',
-                                timeStyle: 'short',
-                              })}
-                            </p>
-                          )}
-                          <a
-                            href={`mailto:${r.email}`}
-                            className={`inline-flex items-center gap-1 text-[10px] font-bold hover:underline ${darkMode ? 'text-blue-400' : 'text-blue-700'}`}
-                          >
-                            <Mail className="w-3 h-3" />
-                            {r.email}
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Ayuda cuando no hay búsqueda */}
-          {!hasSearched && !searching && searchQuery.length < 2 && (
-            <div className={`text-center py-8 rounded-xl border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-              <Users className={`w-10 h-10 mx-auto mb-2 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
-              <p className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Escribe al menos 2 caracteres para comenzar
-              </p>
-              <p className={`text-[11px] mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                Prueba con el nombre o la cédula de un docente
-              </p>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ================== HISTORIAL DE ACCESOS ================== */}
       <div
-        className={`p-6 rounded-2xl border shadow-sm transition-colors ${
-          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+        className={`p-6 rounded-3xl border shadow-lg transition-colors ${
+          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/90'
         }`}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <History className={`w-5 h-5 ${darkMode ? 'text-amber-400' : 'text-blue-900'}`} />
-            <h3 className={`text-sm font-black uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Historial de accesos
-            </h3>
-            <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-2xl ${darkMode ? 'bg-blue-950 text-blue-400 border border-blue-800' : 'bg-blue-50 text-blue-900 border border-blue-100'}`}>
+              <History className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className={`text-sm font-black uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                Historial de Accesos
+              </h3>
+              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Sincronización en tiempo real mediante visión por computadora
+              </p>
+            </div>
+            <span className={`text-xs font-black px-2.5 py-1 rounded-full ${
+              darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
+            }`}>
               {filteredLogs.length}
             </span>
           </div>
 
-          {/* Filtro */}
-          <div
-            className={`flex items-center gap-1 p-1 rounded-lg border text-[11px] ${
-              darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
-            }`}
-          >
+          {/* Filtro de entradas/salidas */}
+          <div className={`flex items-center gap-1 p-1 rounded-xl border text-xs font-bold ${
+            darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
+          }`}>
             <button
               onClick={() => setFilterDirection('all')}
-              className={`px-3 py-1 rounded font-bold transition-colors ${
+              className={`px-3 py-1.5 rounded-lg transition-all ${
                 filterDirection === 'all'
                   ? darkMode
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-blue-900 text-white shadow-xs'
                   : darkMode
                     ? 'text-slate-400 hover:text-slate-200'
@@ -754,7 +645,7 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
             </button>
             <button
               onClick={() => setFilterDirection('entry')}
-              className={`px-3 py-1 rounded font-bold transition-colors ${
+              className={`px-3 py-1.5 rounded-lg transition-all ${
                 filterDirection === 'entry'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : darkMode
@@ -766,7 +657,7 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
             </button>
             <button
               onClick={() => setFilterDirection('exit')}
-              className={`px-3 py-1 rounded font-bold transition-colors ${
+              className={`px-3 py-1.5 rounded-lg transition-all ${
                 filterDirection === 'exit'
                   ? 'bg-sky-600 text-white shadow-xs'
                   : darkMode
@@ -779,33 +670,35 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
           </div>
         </div>
 
-        {/* Tabla / lista */}
+        {/* Tabla */}
         {loading ? (
-          <div className="py-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
-            <RefreshCw className="w-5 h-5 animate-spin text-amber-500" />
-            <span>Cargando bitácora...</span>
+          <div className="py-16 text-center text-xs text-slate-500 flex flex-col items-center gap-3">
+            <RefreshCw className="w-7 h-7 animate-spin text-amber-500" />
+            <span className="font-medium">Cargando registros...</span>
           </div>
         ) : filteredLogs.length === 0 ? (
-          <div className={`py-12 text-center rounded-xl border p-6 space-y-2 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+          <div className={`py-12 text-center rounded-2xl border-2 border-dashed p-8 space-y-2 ${
+            darkMode ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50/60 border-slate-200'
+          }`}>
             <History className="w-8 h-8 text-slate-400 mx-auto" />
-            <p className={`text-xs font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-              Sin registros
+            <p className={`text-sm font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+              Sin eventos registrados
             </p>
-            <p className="text-[11px] text-slate-400">
-              No hay eventos registrados con el filtro actual.
+            <p className="text-xs text-slate-400">
+              No hay movimientos registrados con el filtro actual.
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border ${darkMode ? 'border-slate-800' : 'border-slate-200'}">
-            <table className="w-full text-left">
-              <thead className={darkMode ? 'bg-slate-950' : 'bg-slate-50'}>
+          <div className={`overflow-x-auto rounded-2xl border ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+            <table className="w-full text-left border-collapse">
+              <thead className={darkMode ? 'bg-slate-950/80' : 'bg-slate-50'}>
                 <tr className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <th className="px-4 py-3">Fecha y hora</th>
-                  <th className="px-4 py-3">Tipo</th>
-                  <th className="px-4 py-3 hidden md:table-cell">Punto de acceso</th>
-                  <th className="px-4 py-3 hidden sm:table-cell">Método</th>
-                  <th className="px-4 py-3 hidden sm:table-cell">Certeza IA</th>
-                  <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3.5">Fecha y Hora</th>
+                  <th className="px-4 py-3.5">Tipo</th>
+                  <th className="px-4 py-3.5 hidden md:table-cell">Punto de Acceso</th>
+                  <th className="px-4 py-3.5 hidden sm:table-cell">Método</th>
+                  <th className="px-4 py-3.5 hidden sm:table-cell">Certeza IA</th>
+                  <th className="px-4 py-3.5">Estado</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
@@ -818,8 +711,8 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
                         darkMode ? 'hover:bg-slate-950/50' : 'hover:bg-slate-50'
                       }`}
                     >
-                      <td className={`px-4 py-3 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <div className="flex items-center gap-2">
+                      <td className={`px-4 py-3.5 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <div className="flex items-center gap-2.5">
                           <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <div>
                             <p className="font-bold">
@@ -838,46 +731,40 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-1 rounded border ${
-                            isEntry
-                              ? darkMode
-                                ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                              : darkMode
-                                ? 'bg-sky-950 text-sky-300 border-sky-800'
-                                : 'bg-sky-50 text-sky-800 border-sky-200'
-                          }`}
-                        >
+                      <td className="px-4 py-3.5">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${
+                          isEntry
+                            ? darkMode
+                              ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800'
+                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : darkMode
+                              ? 'bg-sky-950/70 text-sky-300 border-sky-800'
+                              : 'bg-sky-50 text-sky-800 border-sky-200'
+                        }`}>
                           {isEntry ? <LogIn className="w-3 h-3" /> : <LogOut className="w-3 h-3" />}
                           {isEntry ? 'Entrada' : 'Salida'}
                         </span>
                       </td>
-                      <td className={`px-4 py-3 hidden md:table-cell ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <td className={`px-4 py-3.5 hidden md:table-cell font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                         {log.entryPoint}
                       </td>
-                      <td className={`px-4 py-3 hidden sm:table-cell text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {log.method === 'facial_recognition' ? 'Facial' : 'Manual'}
+                      <td className={`px-4 py-3.5 hidden sm:table-cell text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {log.method === 'facial_recognition' ? 'Reconocimiento Facial' : 'Manual'}
                       </td>
-                      <td className={`px-4 py-3 hidden sm:table-cell font-mono font-bold text-amber-500`}>
+                      <td className="px-4 py-3.5 hidden sm:table-cell font-mono font-bold text-amber-500">
                         {(log.confidenceScore * 100).toFixed(0)}%
                       </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-bold ${
-                            log.status === 'authorized'
-                              ? 'text-emerald-500'
-                              : 'text-rose-500'
-                          }`}
-                        >
+                      <td className="px-4 py-3.5">
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${
+                          log.status === 'authorized' ? 'text-emerald-500' : 'text-rose-500'
+                        }`}>
                           {log.status === 'authorized' ? (
                             <>
-                              <Check className="w-3 h-3" /> Autorizado
+                              <Check className="w-3.5 h-3.5" /> Autorizado
                             </>
                           ) : (
                             <>
-                              <AlertCircle className="w-3 h-3" /> Denegado
+                              <AlertCircle className="w-3.5 h-3.5" /> Denegado
                             </>
                           )}
                         </span>
@@ -891,7 +778,7 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
         )}
       </div>
 
-      {/* Modal de avatar */}
+      {/* Modal Avatar */}
       <AvatarModal
         isOpen={showAvatarModal}
         onClose={() => setShowAvatarModal(false)}
