@@ -6,7 +6,6 @@ import {
   Save,
   X,
   Lock,
-  Camera,
   KeyRound,
   ShieldCheck,
   Mail,
@@ -21,7 +20,6 @@ interface EditProfileViewProps {
   currentUser: UserProfile;
   onCancel: () => void;
   onUserUpdated: (updatedUser: UserProfile) => void;
-  onOpenAvatarModal: () => void;
   onOpenChangePassword: () => void;
   darkMode: boolean;
 }
@@ -30,7 +28,6 @@ export const EditProfileView: React.FC<EditProfileViewProps> = ({
   currentUser,
   onCancel,
   onUserUpdated,
-  onOpenAvatarModal,
   onOpenChangePassword,
   darkMode,
 }) => {
@@ -285,23 +282,15 @@ export const EditProfileView: React.FC<EditProfileViewProps> = ({
             {/* Tarjeta Visual de Perfil / Carné */}
             <div className="flex flex-col items-center text-center">
               
-              {/* Avatar con botón de cambio de foto */}
-              <div className="relative group mb-4">
-                <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-amber-500 to-blue-600 blur-sm opacity-70 group-hover:opacity-100 transition-opacity" />
+              {/* Avatar - Solo visual, viene del enrolamiento facial */}
+              <div className="relative mb-4">
+                <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-amber-500 to-blue-600 blur-xl opacity-60" />
                 <img
                   src={currentUser.avatarUrl || AVATAR_FALLBACK}
                   alt={name || 'Usuario'}
                   className="relative w-24 h-24 rounded-full object-cover ring-4 ring-slate-950 shadow-xl"
                   referrerPolicy="no-referrer"
                 />
-                <button
-                  type="button"
-                  onClick={onOpenAvatarModal}
-                  title="Cambiar foto de perfil"
-                  className="absolute bottom-0 right-0 p-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg ring-2 ring-slate-950 transition-transform hover:scale-110 active:scale-95"
-                >
-                  <Camera className="w-4 h-4" />
-                </button>
               </div>
 
               {/* Nombre e Identidad */}

@@ -3,8 +3,8 @@
 > **Sistema de Control de Acceso – UNIMINUTO Sede Ibagué**
 > Control y gestión del acceso **peatonal por reconocimiento facial** (entrada/salida) en torniquetes de la Carrera 5. Proyecto de investigación de **Dilan González** (Ing. de Sistemas, VI semestre, 2026).
 >
-> **Última actualización:** 06/10/2026 · **Estado:** vigente. Incluye reconocimiento facial real (YuNet + SFace), **enrolamiento guiado (poses, delay 1s, modal recomendaciones, mínimo 3 fotos, primera=avatar)**, verificación 1:N con decisión por coseno, bitácora y alerta al celador, modal de foto de perfil con progreso, imagen de respaldo local, JWT, revocación de sesiones, autorización por rol, scrypt para contraseñas y límite de login anti-fuerza bruta.
-> **Cambios documentados en:** `cambios_informe/INFORME_DE_CAMBIOS.md` (#01–#02), `cambios_informe/SEGUNDO_INFORME_DE_CAMBIOS.md` (#03–#04), `cambios_informe/TERCER_INFORME_DE_CAMBIOS.md` (#05–#13), `cambios_informe/CUARTO_INFORME_DE_CAMBIOS.md` (#14–#25), `cambios_informe/QUINTO_INFORME_DE_CAMBIOS.md` (#26–#28) y `cambios_informe/SEXTO_INFORME_DE_CAMBIOS.md` (#29–#34).
+> **Última actualización:** 15/10/2026 · **Estado:** vigente. Incluye reconocimiento facial real (YuNet + SFace), **enrolamiento guiado (poses, delay 1s, modal recomendaciones, mínimo 3 fotos, primera=avatar, aura en bordes)**, verificación 1:N con decisión por coseno, bitácora y alerta al celador, **foto de perfil SOLO desde enrolamiento (sin modal ni botón)**, aura sutil en bordes, JWT, revocación de sesiones, autorización por rol, scrypt para contraseñas y límite de login anti-fuerza bruta.
+> **Cambios documentados en:** `cambios_informe/INFORME_DE_CAMBIOS.md` (#01–#02), `cambios_informe/SEGUNDO_INFORME_DE_CAMBIOS.md` (#03–#04), `cambios_informe/TERCER_INFORME_DE_CAMBIOS.md` (#05–#13), `cambios_informe/CUARTO_INFORME_DE_CAMBIOS.md` (#14–#25), `cambios_informe/QUINTO_INFORME_DE_CAMBIOS.md` (#26–#28), `cambios_informe/SEXTO_INFORME_DE_CAMBIOS.md` (#29–#34) y `cambios_informe/SEPTIMO_INFORME_DE_CAMBIOS.md` (#35–#38).
 
 ---
 
@@ -52,7 +52,7 @@ SCAI - horizon/
 ├── .gitignore                 # Ignora node_modules, .env*, uploads/, models/, *.onnx
 ├── README.md                  # README genérico de AI Studio
 ├── ESTRUCTURA-DEL-PROYECTO.md # Este documento
-├── cambios_informe/           # 6 informes de cambios (#01 a #32)
+├── cambios_informe/           # 7 informes de cambios (#01 a #38)
 ├── public/
 │   └── img/none_profile.jpg   # Imagen de respaldo del perfil (AVATAR_FALLBACK)
 ├── uploads/                   # Respaldo local de imágenes (solo si Cloudinary no está)
@@ -91,9 +91,11 @@ SCAI - horizon/
         ├── Navbar.tsx                 # Menú + tema oscuro
         ├── AuthModal.tsx              # Login/Registro
         ├── MobileAppView.tsx          # Carné digital + foto de perfil + enrolamiento + historial
-        ├── AvatarModal.tsx            # ✔ Modal de foto de perfil con barra de progreso (XHR)
-        ├── FaceEnrollment.tsx         # ✔ Enrolamiento facial guiado: modal recomendaciones, 5 poses, delay 1s, mínimo 3 fotos, primera=foto perfil, sin borrado individual
-        ├── RecognitionCameraModule.tsx# Cámara + simulación de visión IA + pase manual
+        ├── FaceEnrollment.tsx         # ✔ Enrolamiento facial guiado: modal recomendaciones, 5 poses, delay 1s, mínimo 3 fotos, primera=foto perfil, sin borrado individual, aura en bordes
+        ├── RecognitionCameraModule.tsx# Cámara + verificación facial real + pase manual
+        ├── AdminDashboard.tsx         # Panel admin (stats, usuarios, bitácora, CSV)
+        ├── SelfEnrollmentView.tsx     # ✔ Vista de auto-enrolamiento para estudiantes
+        ├── InteractiveBackground.tsx  # ✔ Fondo animado: red neuronal interactiva
         ├── AdminDashboard.tsx         # Panel admin (stats, usuarios, bitácora, CSV)
         └── TechnicalInfoModal.tsx     # Detalles de arquitectura
 ```
@@ -278,19 +280,13 @@ Login y registro sobre `/api/auth/sign-in` y `/api/auth/sign-up`.
 
 ### MobileAppView.tsx
 Carné Digital: foto de perfil, CC, rol, vigencia, QR peatonal y "manos libres".
-- **Subir/quitar foto de perfil**: tocar la foto o el botón "Cambiar/Subir" abre el **modal `AvatarModal`**; el botón de quitar (papelera) actúa directo.
+- **Foto de perfil SOLO visual**: viene del enrolamiento (primera pose frontal). **Sin botón/opción para cambiarla**.
 - **Enrolamiento facial integrado** (`<FaceEnrollment userId={...} />`) en la pestaña Carné.
 - **Historial** de accesos del usuario con filtro Entradas/Salidas y estado dentro/fuera del campus.
 - `authHeaders()` lee el token con `getStoredToken()` (arreglo #14).
+- **Aura en bordes**: gradiente amber→blue, blur-xl, opacity-60 detrás de la foto.
 
-### AvatarModal.tsx  ✔ (nuevo, #26)
-Modal de cambio de foto de perfil:
-- Fondo con `backdrop-blur`, cierre con ✕ / clic fuera / Escape (bloqueado mientras sube), tema claro/oscuro.
-- Zona de subida por **clic o arrastrar** (JPG/PNG/WEBP, máx. 5 MB), vista previa de la nueva foto y botón Guardar.
-- **Barra de progreso con porcentaje real** usando `XMLHttpRequest` (`upload.onprogress`), porque `fetch` no expone el avance de subida.
-- Pantallas: "Preparando archivo…" → barra con % → éxito (cierra) / error con el motivo.
-
-### FaceEnrollment.tsx  ✔ (actualizado #34)
+### FaceEnrollment.tsx  ✔ (actualizado #34, #37, #38)
 Componente de enrolamiento facial **guiado**:
 
 **1. Modal de recomendaciones (siempre visible)**
@@ -315,17 +311,46 @@ Componente de enrolamiento facial **guiado**:
 - **Mínimo 3 fotos** (`MIN_ENROLLMENT_PHOTOS = 3`); botón "Enrolar" deshabilitado hasta cumplir
 - **Primera foto (frontal) = foto de perfil/avatar** del usuario
 - **Sin botones "X" por foto** → no borrado individual; "Descartar" o cerrar cámara = reinicio completo
+- **Aura en bordes**: gradiente amber→blue, blur-xl, opacity-60 detrás de la foto
 
 **4. Flujo técnico**
 - Cámara (`getUserMedia`) → captura JPEG ≤ 720 px (`drawScaled`) → array `shots[]` con data-URLs
 - Submit: `POST /api/users/:id/face-enrollment` con `{ dataUrls: shots, consent }`
 - Backend: sube a Cloudinary → llama Python `/embed` → guarda `faceEmbeddings` 2D + `enrollmentPhotos` → deriva `faceEnrolled`
 
-### RecognitionCameraModule.tsx 👁 — **simulación**
-- `getUserMedia` 1280×720, overlay HUD en canvas, telemetría "AI: MOBILENET-V3" (**etiqueta visual: no hay modelo**).
-- Modo Entrada/Salida, selector de **perfil a simular**, `handlePerformScan()` con latencia artificial de 850 ms, apertura de torniquete y sonido.
-- Pase manual (RF-11).
-- Solo operable por `admin`/`security`.
+### FaceEnrollmentView.tsx  ✔ (nuevo #36)
+Vista dedicada de auto-enrolamiento para estudiantes (accesible desde Navbar):
+- Layout 2 columnas: instrucciones + formulario de enrolamiento
+- Incluye `FaceEnrollment` + instrucciones paso a paso + recomendaciones + nota Ley 1581
+- Botón "Volver al portal" + estado de enrolamiento actual
+
+### SelfEnrollmentView.tsx  ✔ (nuevo #35)
+Vista de auto-enrolamiento facial para estudiantes (accesible desde Navbar):
+- Layout 2 columnas: instrucciones + formulario de enrolamiento
+- Incluye `FaceEnrollment` + instrucciones paso a paso + recomendaciones + nota Ley 1581
+- Botón "Volver al portal" + estado de enrolamiento actual
+
+### InteractiveBackground.tsx  ✔ (nuevo #36)
+Fondo animado con canvas: red neuronal interactiva (nodos + conexiones), mouse tracking, dark/light mode, glow effects.
+
+### RecognitionCameraModule.tsx 👁 — **reconocimiento facial real**
+- Captura snapshot → sube a Cloudinary via `/api/recognition/upload-snapshot` → `POST /api/recognition/verify-face`
+- Python `/embed` → `identifyFace` → coseno 1:N contra MongoDB
+- Match → `authorized: true` + confianza + log + torniquete + alerta si denegado
+- Solo operable por `admin`/`security`
+
+### AdminDashboard.tsx
+Tabs **Stats / Usuarios / Bitácora**: KPIs, gráficas, crear/suspender/eliminar usuarios, filtros y búsqueda.
+- **La descarga CSV es un botón, no un enlace:** necesita la cabecera `Authorization`, genera un `Blob` y lo libera al terminar.
+
+### SelfEnrollmentView.tsx  ✔ (nuevo #35)
+Vista de auto-enrolamiento facial para estudiantes (accesible desde Navbar):
+- Layout 2 columnas: instrucciones + formulario de enrolamiento
+- Incluye `FaceEnrollment` + instrucciones paso a paso + recomendaciones + nota Ley 1581
+- Botón "Volver al portal" + estado de enrolamiento actual
+
+### InteractiveBackground.tsx  ✔ (nuevo #36)
+Fondo animado con canvas: red neuronal interactiva (nodos + conexiones), mouse tracking, dark/light mode, glow effects.
 
 ### AdminDashboard.tsx
 Tabs **Stats / Usuarios / Bitácora**: KPIs, gráficas, crear/suspender/eliminar usuarios, filtros y búsqueda.

@@ -185,11 +185,12 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
 
                 {/* User Body with Photo & Info */}
                 <div className="flex gap-3.5 items-center">
-                  <div className="relative shrink-0">
+                  <div className="relative shrink-0 group">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 to-blue-600 rounded-xl blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
                     <img
                       src={currentUser.avatarUrl || AVATAR_FALLBACK}
                       alt={currentUser.name}
-                      className="w-20 h-24 rounded-xl object-cover border-2 border-blue-900 shadow-sm"
+                      className="w-20 h-24 rounded-xl object-cover border-2 border-blue-900 shadow-sm relative z-10"
                     />
                   </div>
 
