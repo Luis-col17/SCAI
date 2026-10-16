@@ -252,16 +252,16 @@ const authHeaders = (): Record<string, string> => {
     };
   }, [scanning, direction]);
 
-  // Upload snapshot to Cloudinary via backend
+  // Upload snapshot to Cloudinary via backend (dedicated endpoint, no avatar required)
   const uploadSnapshotToCloudinary = async (dataUrl: string): Promise<string> => {
-    const res = await fetch('/api/users/me/avatar', {
+    const res = await fetch('/api/recognition/upload-snapshot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ dataUrl, folder: 'recognition_snapshots' }),
+      body: JSON.stringify({ dataUrl }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error subiendo snapshot');
-    return data.avatarUrl;
+    return data.url;
   };
 
   // Execute Facial Recognition Scan - REAL BIOMETRIC RECOGNITION

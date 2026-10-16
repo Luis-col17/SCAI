@@ -201,7 +201,7 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
         .filter((l) => l.direction === 'entry' && l.status === 'authorized')
         .map((l) => new Date(l.timestamp).toDateString())
     )
-  ).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  ).sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime());
 
   let streak = 0;
   const today = new Date();

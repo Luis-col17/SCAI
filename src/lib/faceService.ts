@@ -61,8 +61,14 @@ export async function requestFaceEmbeddings(images: string[]): Promise<number[][
     const data: any = await response.json();
     const vectors = data?.vectors;
     if (!Array.isArray(vectors) || vectors.length !== images.length) return null;
-    if (!vectors.every(isValidVector)) return null;
-    return vectors;
+    
+    // Filtrar vectores nulos (imágenes no encontradas o sin rostro detectable)
+    const validVectors = vectors.filter((v): v is number[] => 
+      Array.isArray(v) && v.length > 0 && v.every((n) => typeof n === 'number' && Number.isFinite(n))
+    );
+    
+    if (validVectors.length === 0) return null;
+    return validVectors;
   } catch {
     return null;
   } finally {
@@ -113,6 +119,7 @@ export async function identifyFace(snapshotUrl: string): Promise<FaceMatchResult
   let mejor = { usuario: null as any, distancia: Infinity };
 
   for (const u of usuarios) {
+    if (!u.faceEmbeddings || u.faceEmbeddings.length === 0) continue;
     for (const vec of u.faceEmbeddings) {
       const d = cosineDistance(vectors[0], vec);
       if (d < mejor.distancia) mejor = { usuario: u, distancia: d };

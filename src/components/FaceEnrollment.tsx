@@ -117,6 +117,7 @@ export const FaceEnrollment: React.FC<FaceEnrollmentProps> = ({
   userId,
   darkMode = false,
   onEnrollmentComplete,
+  onRefresh,
 }) => {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [faceService, setFaceService] = useState<FaceService | null>(null);

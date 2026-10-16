@@ -48,13 +48,20 @@ class ImageSource:
         return img
 
     @classmethod
-    def desde_url(cls, url: str) -> np.ndarray:
-        """Descarga imagen desde URL (ej. Cloudinary) -> imagen numpy BGR."""
+    def desde_url(cls, url: str):
+        """Descarga imagen desde URL (ej. Cloudinary) -> imagen numpy BGR.
+        
+        Devuelve None si la imagen no existe (404) o hay error de descarga,
+        para que el pipeline pueda continuar con las demás imágenes.
+        """
         try:
             resp = requests.get(url, timeout=10, stream=True)
+            if resp.status_code == 404:
+                return None
             resp.raise_for_status()
         except Exception as e:
-            raise ValueError(f"Error descargando imagen: {e}")
+            # Error de red, timeout, etc. -> devolvemos None para no romper el lote
+            return None
 
         # Detectar formato por Content-Type o extension
         ct = resp.headers.get('Content-Type', '')
@@ -75,12 +82,22 @@ class ImageSource:
         arr = np.frombuffer(raw, dtype=np.uint8)
         img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
         if img is None:
-            raise ValueError("No se pudo decodificar la imagen descargada.")
+            return None
         return img
 
     @classmethod
-    def cargar(cls, origen: str) -> np.ndarray:
-        """Detecta si es data-URL o URL y delega."""
+    def cargar(cls, origen: str):
+        """Detecta si es data-URL o URL y delega.
+        
+        Devuelve None si la imagen no existe o hay error, para que el pipeline
+        pueda continuar procesando el resto de imágenes.
+        """
         if origen.startswith('data:'):
-            return cls.desde_data_url(origen)
-        return cls.desde_url(origen)
+            try:
+                return cls.desde_data_url(origen)
+            except Exception:
+                return None
+        try:
+            return cls.desde_url(origen)
+        except Exception:
+            return None

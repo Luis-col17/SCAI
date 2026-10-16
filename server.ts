@@ -956,6 +956,24 @@ async function startServer() {
       res.status(500).json({ error: err.message });
     }
   });
+  
+  // Subir snapshot de reconocimiento (para evidencia y procesamiento IA)
+  // NO requiere avatar previo, a diferencia de /api/users/me/avatar
+  app.post('/api/recognition/upload-snapshot', authenticateToken, requireRole('admin', 'security'), async (req, res) => {
+    try {
+      const { dataUrl } = req.body;
+      if (!dataUrl) return res.status(400).json({ error: 'Snapshot requerido' });
+
+      const stored = await storeImage({
+        dataUrl,
+        folder: 'recognition_snapshots',
+        publicId: `snap_${(req as any).user.id}_${Date.now()}`,
+      });
+      res.json({ url: stored.url, publicId: stored.publicId, provider: stored.provider });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
 
   // Registro de contingencia manual (RF-11)
   app.post('/api/recognition/manual-access', authenticateToken, requireRole('admin', 'security'), async (req, res) => {

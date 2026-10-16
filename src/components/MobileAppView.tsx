@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import {
+import { 
   IdCard,
   History,
   CheckCircle2,
@@ -11,8 +11,6 @@ import {
   Camera,
   Check,
   Clock,
-  Upload,
-  Trash2
 } from 'lucide-react';
 import type { UserProfile, AccessLog } from '../types.ts';
 import { getStoredToken, AVATAR_FALLBACK } from '../lib/api.ts';
@@ -39,32 +37,6 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
   const authHeaders = (): Record<string, string> => {
     const token = getStoredToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
-  };
-
-  const handleAvatarRemoved = async () => {
-    setAvatarError(null);
-    setAvatarNotice(null);
-    setAvatarUploading(true);
-    try {
-      const response = await fetch(`/api/users/${currentUser.id}/avatar`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-      });
-      const payload = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(payload?.error || 'No se pudo quitar la foto de perfil');
-      }
-
-      setAvatarUrl(undefined);
-      onUserUpdated?.(payload.user);
-      onRefresh();
-      setAvatarNotice('Foto de perfil quitada.');
-    } catch (err: any) {
-      setAvatarError(err.message || 'Error al quitar la foto de perfil');
-    } finally {
-      setAvatarUploading(false);
-    }
   };
 
   // Load user access logs
