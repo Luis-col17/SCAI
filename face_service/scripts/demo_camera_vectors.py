@@ -111,6 +111,8 @@ class DemoCameraVectors:
             ret, frame = cap.read()
             if not ret:
                 break
+            #invertir
+            frame = cv2.flip(frame, 1)
 
             # 1. Detectar rostro principal
             rostro = self.detector.detectar_mayor(frame)
