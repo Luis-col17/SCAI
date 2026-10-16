@@ -29,7 +29,6 @@ import {
 } from 'lucide-react';
 import type { UserProfile, AccessLog, UserRole } from '../types';
 import { getStoredToken, AVATAR_FALLBACK } from '../lib/api';
-import { AvatarModal } from './AvatarModal';
 
 const ENABLE_SEARCH_LOCATION = false;
 
@@ -75,10 +74,6 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
   const [filterDirection, setFilterDirection] = useState<'all' | 'entry' | 'exit'>('all');
 
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(currentUser.avatarUrl);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [avatarError, setAvatarError] = useState<string | null>(null);
-  const [avatarNotice, setAvatarNotice] = useState<string | null>(null);
-  const [showAvatarModal, setShowAvatarModal] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -148,28 +143,6 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
     return () => clearTimeout(handle);
   }, [searchQuery]);
 
-  const handleAvatarRemoved = async () => {
-    setAvatarError(null);
-    setAvatarNotice(null);
-    setAvatarUploading(true);
-    try {
-      const response = await fetch(`/api/users/${currentUser.id}/avatar`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'No se pudo quitar la foto');
-      setAvatarUrl(undefined);
-      onUserUpdated?.(payload.user);
-      onRefresh();
-      setAvatarNotice('Foto de perfil quitada.');
-    } catch (err: any) {
-      setAvatarError(err.message || 'Error al quitar la foto');
-    } finally {
-      setAvatarUploading(false);
-    }
-  };
-
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -201,7 +174,7 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
         .filter((l) => l.direction === 'entry' && l.status === 'authorized')
         .map((l) => new Date(l.timestamp).toDateString())
     )
-  ).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  ).sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime());
 
   let streak = 0;
   const today = new Date();
@@ -384,64 +357,15 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
           <div className="p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
               
-              {/* Foto de Perfil */}
+              {/* Foto de Perfil - Solo visual, viene del enrolamiento facial */}
               <div className="shrink-0 flex flex-col items-center gap-3">
-                <div className="relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 to-blue-600 rounded-3xl blur-xs opacity-70 group-hover:opacity-100 transition duration-300" />
-                  <button
-                    type="button"
-                    onClick={() => setShowAvatarModal(true)}
-                    disabled={avatarUploading}
-                    className={`relative w-36 h-44 rounded-2xl overflow-hidden border-2 border-white dark:border-slate-800 shadow-md transition-all ${
-                      avatarUploading ? 'opacity-60 cursor-wait' : 'cursor-pointer hover:scale-[1.02]'
-                    }`}
-                  >
-                    <img
-                      src={avatarUrl || AVATAR_FALLBACK}
-                      alt={currentUser.name}
-                      className="w-full h-full object-cover"
-                    />
-                    {avatarUploading && (
-                      <span className="absolute inset-0 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs">
-                        <RefreshCw className="w-7 h-7 text-amber-400 animate-spin" />
-                      </span>
-                    )}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs font-bold gap-1">
-                      <Camera className="w-5 h-5" />
-                      <span>Cambiar foto</span>
-                    </div>
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAvatarModal(true)}
-                    disabled={avatarUploading}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs ${
-                      darkMode
-                        ? 'bg-blue-900/40 text-blue-300 border border-blue-700/60 hover:bg-blue-800/60'
-                        : 'bg-blue-50 text-blue-950 border border-blue-200 hover:bg-blue-100'
-                    }`}
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    {avatarUrl ? 'Editar' : 'Subir'}
-                  </button>
-                  {avatarUrl && (
-                    <button
-                      type="button"
-                      onClick={handleAvatarRemoved}
-                      disabled={avatarUploading}
-                      title="Quitar foto"
-                      className={`p-1.5 rounded-xl border transition-colors ${
-                        darkMode
-                          ? 'bg-rose-950/50 text-rose-300 border-rose-800/60 hover:bg-rose-900'
-                          : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'
-                      }`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                <div className="relative">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 to-blue-600 rounded-2xl blur-xl opacity-60" />
+                  <img
+                    src={avatarUrl || AVATAR_FALLBACK}
+                    alt={currentUser.name}
+                    className="w-36 h-44 rounded-2xl object-cover border-2 border-white dark:border-slate-800 shadow-md relative z-10"
+                  />
                 </div>
               </div>
 
@@ -778,17 +702,6 @@ export const WebAppView: React.FC<WebAppViewProps> = ({
         )}
       </div>
 
-      {/* Modal Avatar */}
-      <AvatarModal
-        isOpen={showAvatarModal}
-        onClose={() => setShowAvatarModal(false)}
-        darkMode={darkMode}
-        userId={currentUser.id}
-        userName={currentUser.name}
-        currentAvatarUrl={avatarUrl}
-        onUserUpdated={onUserUpdated}
-        onRefresh={onRefresh}
-      />
-    </div>
+      </div>
   );
 };

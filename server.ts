@@ -20,12 +20,13 @@ import {
   updatePasswordHash,
   saveFaceEnrollment,
   summarizeEnrollment,
+  getAllUsersWithEmbeddings,
 } from './src/db/index.ts';
 import { connectToMongoDB, getMongoConnectionStatus } from './src/db/mongo/connection.ts';
 import { storeImage, removeImage, isCloudinaryConfigured, parseDataUrl } from './src/lib/imageStorage.ts';
 import { signSessionToken, verifySessionToken } from './src/lib/jwt.ts';
 import { hashPassword, verifyPassword, validatePasswordStrength } from './src/lib/password.ts';
-import { getFaceServiceStatus, requestFaceEmbeddings } from './src/lib/faceService.ts';
+import { getFaceServiceStatus, requestFaceEmbeddings, identifyFace } from './src/lib/faceService.ts';
 import {
   checkLoginAttempt,
   recordLoginFailure,
@@ -34,30 +35,30 @@ import {
 } from './src/lib/rateLimit.ts';
 import type { UserRole, AccessStatus, AccessDirection } from './src/types.ts';
 
-  const PORT = 3000;
-  // Multi-plantilla: varias fotos -> varios vectores por persona.
-  const MAX_ENROLLMENT_PHOTOS = 5;
+const PORT = 3000;
+// Multi-plantilla: varias fotos -> varios vectores por persona.
+const MAX_ENROLLMENT_PHOTOS = 5;
 
-  /**
-   * Intenta borrar imágenes del almacenamiento externo y devuelve cuáles
-   * quedaron ahí. La referencia en la base se limpia igual: si Cloudinary falla,
-   * el usuario sí dejó de estar enrolado, pero el archivo externo queda huérfano
-   * y hay que avisar en la consola para limpiarlo a mano.
-   */
-  const purgeImages = async (publicIds: (string | undefined)[]): Promise<string[]> => {
-    const orphans: string[] = [];
-    for (const publicId of publicIds) {
-      if (!publicId) continue;
-      const result = await removeImage(publicId);
-      if (!result.ok) orphans.push(publicId);
-    }
-    if (orphans.length > 0) {
-      console.warn(
-        `[Almacen] ${orphans.length} imagen(es) no se pudieron borrar y quedaron en el almacen externo: ${orphans.join(', ')}`
-      );
-    }
-    return orphans;
-  };
+/**
+ * Intenta borrar imágenes del almacenamiento externo y devuelve cuáles
+ * quedaron ahí. La referencia en la base se limpia igual: si Cloudinary falla,
+ * el usuario sí dejó de estar enrolado, pero el archivo externo queda huérfano
+ * y hay que avisar en la consola para limpiarlo a mano.
+ */
+const purgeImages = async (publicIds: (string | undefined)[]): Promise<string[]> => {
+  const orphans: string[] = [];
+  for (const publicId of publicIds) {
+    if (!publicId) continue;
+    const result = await removeImage(publicId);
+    if (!result.ok) orphans.push(publicId);
+  }
+  if (orphans.length > 0) {
+    console.warn(
+      `[Almacen] ${orphans.length} imagen(es) no se pudieron borrar y quedaron en el almacen externo: ${orphans.join(', ')}`
+    );
+  }
+  return orphans;
+};
 
 async function startServer() {
   const app = express();
@@ -66,7 +67,7 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads'), { maxAge: '7d' }));
 
-    const authenticateToken = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authenticateToken = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     try {
       const authHeader = req.headers['authorization'];
       const token = authHeader && authHeader.split(' ')[1];
@@ -217,7 +218,7 @@ async function startServer() {
   // Sign Up / Register
   app.post('/api/auth/sign-up', async (req, res) => {
     try {
-      const { name, email, password, documentId, facultyOrDept, phone } = req.body;
+      const { name, email, password, documentId, facultyOrDept, phone, role } = req.body;
       if (!name || !email || !password || !documentId) {
         return res.status(400).json({ error: 'Nombre, correo institucional, cédula y contraseña son requeridos' });
       }
@@ -227,7 +228,7 @@ async function startServer() {
         return res.status(400).json({ error: weak });
       }
 
-            // 🚧 MODO PRUEBAS: se permite elegir cualquier rol desde el registro público.
+      // 🚧 MODO PRUEBAS: se permite elegir cualquier rol desde el registro público.
       // Antes de la sustentación final, revertir a `role: 'student'` y agregar
       // el flujo de aprobación por admin (Opción C).
       const allowedRoles: UserRole[] = ['admin', 'security', 'student', 'teacher', 'staff', 'visitor'];
@@ -305,90 +306,90 @@ async function startServer() {
   });
 
   // --- BÚSQUEDA DE UBICACIÓN DE PERSONAL (profesores, admin, staff, security) ---
-// Reglas de privacidad (Ley 1581 - datos personales):
-//   - Un student o teacher solo puede buscar a teacher/staff/admin/security.
-//   - Un admin o security puede buscar a cualquiera (incluye estudiantes).
-//   - getAllUsers() ya devuelve datos sanitizados (sin passwordHash ni faceEmbeddings).
-app.get('/api/users/search-location', authenticateToken, async (req, res) => {
-  try {
-    const sessionUser = (req as any).user as { id: string; role: UserRole };
-    const query = String(req.query.q ?? '').trim().toLowerCase();
+  // Reglas de privacidad (Ley 1581 - datos personales):
+  //   - Un student o teacher solo puede buscar a teacher/staff/admin/security.
+  //   - Un admin o security puede buscar a cualquiera (incluye estudiantes).
+  //   - getAllUsers() ya devuelve datos sanitizados (sin passwordHash ni faceEmbeddings).
+  app.get('/api/users/search-location', authenticateToken, async (req, res) => {
+    try {
+      const sessionUser = (req as any).user as { id: string; role: UserRole };
+      const query = String(req.query.q ?? '').trim().toLowerCase();
 
-    if (query.length < 2) {
-      return res.status(400).json({ error: 'Escribe al menos 2 caracteres para buscar' });
+      if (query.length < 2) {
+        return res.status(400).json({ error: 'Escribe al menos 2 caracteres para buscar' });
+      }
+
+      // Roles que pueden aparecer en resultados para usuarios no privilegiados
+      const SEARCHABLE_ROLES: UserRole[] = ['teacher', 'staff', 'admin', 'security'];
+      const isPrivileged = sessionUser.role === 'admin' || sessionUser.role === 'security';
+
+      // Roles que el solicitante puede ver
+      const allowedRoles: UserRole[] = isPrivileged
+        ? ['teacher', 'staff', 'admin', 'security', 'student', 'visitor']
+        : SEARCHABLE_ROLES;
+
+      // getAllUsers() ya devuelve UserProfile[] sanitizado (sin passwordHash)
+      const allUsers = await getAllUsers();
+      const matched = allUsers
+        .filter((u) => allowedRoles.includes(u.role))
+        .filter((u) => {
+          const name = (u.name || '').toLowerCase();
+          const doc = (u.documentId || '').toLowerCase();
+          const email = (u.email || '').toLowerCase();
+          return name.includes(query) || doc.includes(query) || email.includes(query);
+        })
+        .slice(0, 10); // máximo 10 resultados
+
+      // Para cada resultado, inferir ubicación desde su último log autorizado
+      const enriched = await Promise.all(
+        matched.map(async (u) => {
+          // getAccessLogs SÍ soporta { userId, limit } (verificado)
+          const logs = await getAccessLogs({ userId: u.id, limit: 1 });
+          const lastLog = logs[0];
+
+          let inferredStatus: 'inside' | 'outside' | 'unknown' = 'unknown';
+          let lastLocation: string | null = null;
+          let lastTimestamp: string | null = null;
+          let lastDirection: 'entry' | 'exit' | null = null;
+
+          if (lastLog && lastLog.status === 'authorized') {
+            lastDirection = lastLog.direction;
+            lastLocation = lastLog.entryPoint;
+            lastTimestamp = lastLog.timestamp;
+            inferredStatus = lastLog.direction === 'entry' ? 'inside' : 'outside';
+          } else if (lastLog) {
+            // Último log denegado: conocemos el punto pero no la dirección real
+            lastLocation = lastLog.entryPoint;
+            lastTimestamp = lastLog.timestamp;
+            lastDirection = lastLog.direction;
+          }
+
+          return {
+            id: u.id,
+            name: u.name,
+            role: u.role,
+            email: u.email,
+            documentId: u.documentId,
+            avatarUrl: u.avatarUrl,
+            facultyOrDept: u.facultyOrDept,
+            status: u.status,
+            inferredStatus,
+            lastLocation,
+            lastTimestamp,
+            lastDirection,
+          };
+        })
+      );
+
+      // Ordenar: primero los que están "dentro" (más útiles para el usuario)
+      const weight: Record<string, number> = { inside: 0, unknown: 1, outside: 2 };
+      enriched.sort((a, b) => weight[a.inferredStatus] - weight[b.inferredStatus]);
+
+      res.json({ results: enriched, query });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
-
-    // Roles que pueden aparecer en resultados para usuarios no privilegiados
-    const SEARCHABLE_ROLES: UserRole[] = ['teacher', 'staff', 'admin', 'security'];
-    const isPrivileged = sessionUser.role === 'admin' || sessionUser.role === 'security';
-
-    // Roles que el solicitante puede ver
-    const allowedRoles: UserRole[] = isPrivileged
-      ? ['teacher', 'staff', 'admin', 'security', 'student', 'visitor']
-      : SEARCHABLE_ROLES;
-
-    // getAllUsers() ya devuelve UserProfile[] sanitizado (sin passwordHash)
-    const allUsers = await getAllUsers();
-    const matched = allUsers
-      .filter((u) => allowedRoles.includes(u.role))
-      .filter((u) => {
-        const name = (u.name || '').toLowerCase();
-        const doc = (u.documentId || '').toLowerCase();
-        const email = (u.email || '').toLowerCase();
-        return name.includes(query) || doc.includes(query) || email.includes(query);
-      })
-      .slice(0, 10); // máximo 10 resultados
-
-    // Para cada resultado, inferir ubicación desde su último log autorizado
-    const enriched = await Promise.all(
-      matched.map(async (u) => {
-        // getAccessLogs SÍ soporta { userId, limit } (verificado)
-        const logs = await getAccessLogs({ userId: u.id, limit: 1 });
-        const lastLog = logs[0];
-
-        let inferredStatus: 'inside' | 'outside' | 'unknown' = 'unknown';
-        let lastLocation: string | null = null;
-        let lastTimestamp: string | null = null;
-        let lastDirection: 'entry' | 'exit' | null = null;
-
-        if (lastLog && lastLog.status === 'authorized') {
-          lastDirection = lastLog.direction;
-          lastLocation = lastLog.entryPoint;
-          lastTimestamp = lastLog.timestamp;
-          inferredStatus = lastLog.direction === 'entry' ? 'inside' : 'outside';
-        } else if (lastLog) {
-          // Último log denegado: conocemos el punto pero no la dirección real
-          lastLocation = lastLog.entryPoint;
-          lastTimestamp = lastLog.timestamp;
-          lastDirection = lastLog.direction;
-        }
-
-        return {
-          id: u.id,
-          name: u.name,
-          role: u.role,
-          email: u.email,
-          documentId: u.documentId,
-          avatarUrl: u.avatarUrl,
-          facultyOrDept: u.facultyOrDept,
-          status: u.status,
-          inferredStatus,
-          lastLocation,
-          lastTimestamp,
-          lastDirection,
-        };
-      })
-    );
-
-    // Ordenar: primero los que están "dentro" (más útiles para el usuario)
-    const weight: Record<string, number> = { inside: 0, unknown: 1, outside: 2 };
-    enriched.sort((a, b) => weight[a.inferredStatus] - weight[b.inferredStatus]);
-
-    res.json({ results: enriched, query });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+  });
 
   // Crear usuarios: vigilancia/administración. Solo un admin puede crear otro admin.
   app.post('/api/users', authenticateToken, requireRole('admin', 'security'), async (req, res) => {
@@ -457,123 +458,123 @@ app.get('/api/users/search-location', authenticateToken, async (req, res) => {
   });
 
   // --- EDITAR MI PROPIO PERFIL (self-service) ---
-// Solo permite editar name, phone y facultyOrDept.
-// email, documentId, role y status quedan bloqueados por seguridad.
-app.patch('/api/users/me', authenticateToken, async (req, res) => {
-  try {
-    const sessionUser = (req as any).user as { id: string; role: UserRole };
-    const { name, phone, facultyOrDept } = req.body ?? {};
+  // Solo permite editar name, phone y facultyOrDept.
+  // email, documentId, role y status quedan bloqueados por seguridad.
+  app.patch('/api/users/me', authenticateToken, async (req, res) => {
+    try {
+      const sessionUser = (req as any).user as { id: string; role: UserRole };
+      const { name, phone, facultyOrDept } = req.body ?? {};
 
-    // Construir el payload solo con los campos permitidos
-    const updates: Record<string, string> = {};
+      // Construir el payload solo con los campos permitidos
+      const updates: Record<string, string> = {};
 
-    if (name !== undefined) {
-      const cleanName = String(name).trim();
-      if (cleanName.length < 3) {
-        return res.status(400).json({ error: 'El nombre debe tener al menos 3 caracteres' });
+      if (name !== undefined) {
+        const cleanName = String(name).trim();
+        if (cleanName.length < 3) {
+          return res.status(400).json({ error: 'El nombre debe tener al menos 3 caracteres' });
+        }
+        if (cleanName.length > 80) {
+          return res.status(400).json({ error: 'El nombre no puede tener más de 80 caracteres' });
+        }
+        if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s'-]+$/.test(cleanName)) {
+          return res.status(400).json({ error: 'El nombre solo puede contener letras y espacios' });
+        }
+        updates.name = cleanName;
       }
-      if (cleanName.length > 80) {
-        return res.status(400).json({ error: 'El nombre no puede tener más de 80 caracteres' });
+
+      if (phone !== undefined) {
+        const cleanPhone = String(phone).trim().replace(/[\s-]/g, '');
+        if (cleanPhone !== '' && !/^\d{7,15}$/.test(cleanPhone)) {
+          return res.status(400).json({ error: 'El teléfono debe tener entre 7 y 15 dígitos' });
+        }
+        updates.phone = cleanPhone;
       }
-      if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s'-]+$/.test(cleanName)) {
-        return res.status(400).json({ error: 'El nombre solo puede contener letras y espacios' });
+
+      if (facultyOrDept !== undefined) {
+        const cleanFaculty = String(facultyOrDept).trim();
+        if (cleanFaculty.length > 120) {
+          return res.status(400).json({ error: 'El programa/facultad es demasiado largo' });
+        }
+        updates.facultyOrDept = cleanFaculty;
       }
-      updates.name = cleanName;
-    }
 
-    if (phone !== undefined) {
-      const cleanPhone = String(phone).trim().replace(/[\s-]/g, '');
-      if (cleanPhone !== '' && !/^\d{7,15}$/.test(cleanPhone)) {
-        return res.status(400).json({ error: 'El teléfono debe tener entre 7 y 15 dígitos' });
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: 'No enviaste ningún campo para actualizar' });
       }
-      updates.phone = cleanPhone;
-    }
 
-    if (facultyOrDept !== undefined) {
-      const cleanFaculty = String(facultyOrDept).trim();
-      if (cleanFaculty.length > 120) {
-        return res.status(400).json({ error: 'El programa/facultad es demasiado largo' });
+      // Actualizar el usuario
+      const updated = await updateUser(sessionUser.id, updates);
+
+      // Actualizar la sesión en memoria del servidor (para que /api/auth/me devuelva los datos nuevos)
+      (req as any).user = { ...sessionUser, ...updates };
+
+      res.json({
+        user: updated,
+        message: 'Perfil actualizado correctamente',
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- CAMBIAR MI PROPIA CONTRASEÑA ---
+  // Requiere la contraseña actual como verificación.
+  // Al cambiarla con éxito, se revocan TODOS los tokens activos del usuario
+  // (expulsa la sesión en todos sus dispositivos, incluida esta).
+  app.patch('/api/users/me/password', authenticateToken, async (req, res) => {
+    try {
+      const sessionUser = (req as any).user as { id: string };
+      const { currentPassword, newPassword } = req.body ?? {};
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Debes enviar la contraseña actual y la nueva' });
       }
-      updates.facultyOrDept = cleanFaculty;
+
+      // Validar la nueva contra la política de contraseñas (misma que el registro)
+      const weak = validatePasswordStrength(newPassword);
+      if (weak) {
+        return res.status(400).json({ error: weak });
+      }
+
+      // Cargar el usuario con su hash
+      const user = await findUserById(sessionUser.id);
+      if (!user) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+
+      // Verificar la contraseña actual
+      const { valid } = await verifyPassword(currentPassword, user.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+      }
+
+      // Verificar que la nueva no sea igual a la actual
+      const { valid: isSameAsOld } = await verifyPassword(newPassword, user.passwordHash);
+      if (isSameAsOld) {
+        return res.status(400).json({ error: 'La nueva contraseña no puede ser igual a la actual' });
+      }
+
+      // Actualizar el hash
+      await updatePasswordHash(user.id, await hashPassword(newPassword));
+
+      // 🚨 Revocar TODOS los tokens del usuario (no solo el actual).
+      // Esto expulsa al usuario de todos sus dispositivos y requiere re-login.
+      // El token actual también queda revocado.
+      const token = (req as any).token as string;
+      const claims = verifySessionToken(token);
+      if (claims) {
+        await revokeAllUserTokens(claims.userId);
+      }
+
+      res.json({
+        success: true,
+        message: 'Contraseña actualizada. Debes volver a iniciar sesión.',
+        forceLogout: true,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
-
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ error: 'No enviaste ningún campo para actualizar' });
-    }
-
-    // Actualizar el usuario
-    const updated = await updateUser(sessionUser.id, updates);
-
-    // Actualizar la sesión en memoria del servidor (para que /api/auth/me devuelva los datos nuevos)
-    (req as any).user = { ...sessionUser, ...updates };
-
-    res.json({
-      user: updated,
-      message: 'Perfil actualizado correctamente',
-    });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// --- CAMBIAR MI PROPIA CONTRASEÑA ---
-// Requiere la contraseña actual como verificación.
-// Al cambiarla con éxito, se revocan TODOS los tokens activos del usuario
-// (expulsa la sesión en todos sus dispositivos, incluida esta).
-app.patch('/api/users/me/password', authenticateToken, async (req, res) => {
-  try {
-    const sessionUser = (req as any).user as { id: string };
-    const { currentPassword, newPassword } = req.body ?? {};
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Debes enviar la contraseña actual y la nueva' });
-    }
-
-    // Validar la nueva contra la política de contraseñas (misma que el registro)
-    const weak = validatePasswordStrength(newPassword);
-    if (weak) {
-      return res.status(400).json({ error: weak });
-    }
-
-    // Cargar el usuario con su hash
-    const user = await findUserById(sessionUser.id);
-    if (!user) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
-
-    // Verificar la contraseña actual
-    const { valid } = await verifyPassword(currentPassword, user.passwordHash);
-    if (!valid) {
-      return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
-    }
-
-    // Verificar que la nueva no sea igual a la actual
-    const { valid: isSameAsOld } = await verifyPassword(newPassword, user.passwordHash);
-    if (isSameAsOld) {
-      return res.status(400).json({ error: 'La nueva contraseña no puede ser igual a la actual' });
-    }
-
-    // Actualizar el hash
-    await updatePasswordHash(user.id, await hashPassword(newPassword));
-
-    // 🚨 Revocar TODOS los tokens del usuario (no solo el actual).
-    // Esto expulsa al usuario de todos sus dispositivos y requiere re-login.
-    // El token actual también queda revocado.
-    const token = (req as any).token as string;
-    const claims = verifySessionToken(token);
-    if (claims) {
-      await revokeAllUserTokens(claims.userId);
-    }
-
-    res.json({
-      success: true,
-      message: 'Contraseña actualizada. Debes volver a iniciar sesión.',
-      forceLogout: true,
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+  });
 
   // --- FOTO DE PERFIL (subida / edición) ---
 
@@ -616,6 +617,25 @@ app.patch('/api/users/me/password', authenticateToken, async (req, res) => {
     }
   });
 
+  // Subir snapshot de reconocimiento (para evidencia y procesamiento IA)
+  app.post('/api/users/me/avatar', authenticateToken, async (req, res) => {
+    try {
+      const sessionUser = (req as any).user as { id: string; role: UserRole };
+      const target = await findUserById(sessionUser.id);
+      if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+      const stored = await storeImage({
+        dataUrl: req.body?.dataUrl,
+        folder: 'recognition_snapshots',
+        publicId: `recognition_${target.id}_${Date.now()}`,
+      });
+
+      res.json({ avatarUrl: stored.url, avatarPublicId: stored.publicId, provider: stored.provider });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   app.delete('/api/users/:id/avatar', authenticateToken, async (req, res) => {
     try {
       const sessionUser = (req as any).user as { id: string; role: UserRole };
@@ -642,138 +662,147 @@ app.patch('/api/users/me/password', authenticateToken, async (req, res) => {
     }
   });
 
-    // -----------------------------------------------------------------
-    // ENROLAMIENTO FACIAL (captura de rostro -> fotos -> vectores)
-    // Permiso: el propio usuario o un administrador. Seguridad queda
-    // fuera a proposito: disposable biometrico de otra persona.
-    // -----------------------------------------------------------------
+  // -----------------------------------------------------------------
+  // ENROLAMIENTO FACIAL (captura de rostro -> fotos -> vectores)
+  // Permiso: el propio usuario o un administrador. Seguridad queda
+  // fuera a proposito: disposable biometrico de otra persona.
+  // -----------------------------------------------------------------
 
-    app.get('/api/users/:id/face-enrollment', authenticateToken, async (req, res) => {
-      try {
-        const sessionUser = (req as any).user as { id: string; role: UserRole };
-        const isOwner = sessionUser.id === req.params.id as string;
-        if (!isOwner && sessionUser.role !== 'admin') {
-          return res.status(403).json({ error: 'Solo puedes ver tu propio enrolamiento facial' });
-        }
-
-        const target = await findUserById(req.params.id as string);
-        if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
-
-        res.json({
-          enrollment: summarizeEnrollment(target),
-          faceService: getFaceServiceStatus(),
-          consentRequired: true,
-        });
-      } catch (err: any) {
-        res.status(500).json({ error: err.message });
+  app.get('/api/users/:id/face-enrollment', authenticateToken, async (req, res) => {
+    try {
+      const sessionUser = (req as any).user as { id: string; role: UserRole };
+      const isOwner = sessionUser.id === req.params.id as string;
+      if (!isOwner && sessionUser.role !== 'admin') {
+        return res.status(403).json({ error: 'Solo puedes ver tu propio enrolamiento facial' });
       }
-    });
 
-    app.post('/api/users/:id/face-enrollment', authenticateToken, async (req, res) => {
-      const savedPhotoIds: string[] = [];
-      try {
-        const sessionUser = (req as any).user as { id: string; role: UserRole };
-        const isOwner = sessionUser.id === req.params.id as string;
-        if (!isOwner && sessionUser.role !== 'admin') {
-          return res.status(403).json({ error: 'Solo puedes enrolar tu propio rostro' });
-        }
+      const target = await findUserById(req.params.id as string);
+      if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-        const target = await findUserById(req.params.id as string);
-        if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+      res.json({
+        enrollment: summarizeEnrollment(target),
+        faceService: getFaceServiceStatus(),
+        consentRequired: true,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
-        const dataUrls: unknown = req.body?.dataUrls;
-        if (!Array.isArray(dataUrls) || dataUrls.length === 0) {
-          return res.status(400).json({ error: 'Debes enviar al menos una foto' });
-        }
-        if (dataUrls.length > MAX_ENROLLMENT_PHOTOS) {
-          return res.status(400).json({ error: `Maximo ${MAX_ENROLLMENT_PHOTOS} fotos por enrolamiento` });
-        }
-        if (req.body?.consent !== true) {
-          return res.status(400).json({ error: 'Se requiere consentimiento para tratar datos biometricos' });
-        }
+  app.post('/api/users/:id/face-enrollment', authenticateToken, async (req, res) => {
+    const savedPhotoIds: string[] = [];
+    try {
+      const sessionUser = (req as any).user as { id: string; role: UserRole };
+      const isOwner = sessionUser.id === req.params.id as string;
+      if (!isOwner && sessionUser.role !== 'admin') {
+        return res.status(403).json({ error: 'Solo puedes enrolar tu propio rostro' });
+      }
 
-        // Validar formato y tamano antes de subir nada.
-        dataUrls.forEach((dataUrl: unknown, index: number) => {
-          try {
-            parseDataUrl(dataUrl);
-          } catch (validationError: any) {
-            const received = typeof dataUrl === 'string' ? dataUrl.slice(0, 40) : typeof dataUrl;
-            throw new Error(`Foto ${index + 1} invalida (llego ${received}): ${validationError.message}`);
-          }
-        });
+      const target = await findUserById(req.params.id as string);
+      if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-        const photos: { photoUrl: string; photoPublicId: string }[] = [];
+      const dataUrls: unknown = req.body?.dataUrls;
+      if (!Array.isArray(dataUrls) || dataUrls.length === 0) {
+        return res.status(400).json({ error: 'Debes enviar al menos una foto' });
+      }
+      if (dataUrls.length > MAX_ENROLLMENT_PHOTOS) {
+        return res.status(400).json({ error: `Maximo ${MAX_ENROLLMENT_PHOTOS} fotos por enrolamiento` });
+      }
+      if (req.body?.consent !== true) {
+        return res.status(400).json({ error: 'Se requiere consentimiento para tratar datos biometricos' });
+      }
+
+      // Validar formato y tamano antes de subir nada.
+      dataUrls.forEach((dataUrl: unknown, index: number) => {
         try {
-          for (let i = 0; i < dataUrls.length; i++) {
-            const stored = await storeImage({
-              dataUrl: dataUrls[i] as string,
-              folder: 'enrollment',
-              publicId: `enroll_${target.id}_${Date.now()}_${i}`,
-            });
-            savedPhotoIds.push(stored.publicId);
-            photos.push({ photoUrl: stored.url, photoPublicId: stored.publicId });
-          }
-        } catch (uploadError: any) {
-          // Si una foto falla, se revierte lo ya subido para no dejar basura.
-          await purgeImages(savedPhotoIds);
-          throw uploadError;
+          parseDataUrl(dataUrl);
+        } catch (validationError: any) {
+          const received = typeof dataUrl === 'string' ? dataUrl.slice(0, 40) : typeof dataUrl;
+          throw new Error(`Foto ${index + 1} invalida (llego ${received}): ${validationError.message}`);
         }
+      });
 
-        // Vectores: el servicio de IA todavia no existe, quedan pendientes.
-        const vectors = await requestFaceEmbeddings(dataUrls as string[]);
-
-        const enrollment = await saveFaceEnrollment(target.id, { photos, embeddings: vectors ?? [] });
-
-        // Las fotos anteriores dejan de ser necesarias: se borran del almacen.
-        const previousPhotos = (target.enrollmentPhotos ?? [])
-          .filter(old => !savedPhotoIds.includes(old.photoPublicId))
-          .map(old => old.photoPublicId);
-        const orphanedPhotos = await purgeImages(previousPhotos);
-
-        res.status(201).json({
-          enrollment,
-          vectorsGenerated: vectors ? vectors.length : 0,
-          pendingReason: vectors
-            ? null
-            : 'Las fotos se guardaron, pero faltan los vectores: el servicio de IA (Python) aun no esta implementado.',
-          storage: isCloudinaryConfigured() ? 'cloudinary' : 'local',
-          orphanedPhotos,
-        });
-      } catch (err: any) {
-        res.status(400).json({ error: err.message });
-      }
-    });
-
-    app.delete('/api/users/:id/face-enrollment', authenticateToken, async (req, res) => {
+      const photos: { photoUrl: string; photoPublicId: string }[] = [];
       try {
-        const sessionUser = (req as any).user as { id: string; role: UserRole };
-        const isOwner = sessionUser.id === req.params.id as string;
-        if (!isOwner && sessionUser.role !== 'admin') {
-          return res.status(403).json({ error: 'Solo puedes eliminar tu propio enrolamiento facial' });
+        for (let i = 0; i < dataUrls.length; i++) {
+          const stored = await storeImage({
+            dataUrl: dataUrls[i] as string,
+            folder: 'enrollment',
+            publicId: `enroll_${target.id}_${Date.now()}_${i}`,
+          });
+          savedPhotoIds.push(stored.publicId);
+          photos.push({ photoUrl: stored.url, photoPublicId: stored.publicId });
         }
-
-        const target = await findUserById(req.params.id as string);
-        if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
-
-        // El registro en la base se limpia siempre; lo que no se borre en el
-        // almacen externo se reporta como huerfano para limpiarlo a mano.
-        const orphanedPhotos = await purgeImages((target.enrollmentPhotos ?? []).map(p => p.photoPublicId));
-        const enrollment = await saveFaceEnrollment(target.id, { photos: [], embeddings: [] });
-
-        res.json({
-          enrollment,
-          deletedPhotos: (target.enrollmentPhotos ?? []).length,
-          orphanedPhotos,
-          notice: orphanedPhotos.length > 0
-            ? `${orphanedPhotos.length} foto(s) quedaron en el almacen externo y deben borrarse a mano.`
-            : null,
-        });
-      } catch (err: any) {
-        res.status(400).json({ error: err.message });
+      } catch (uploadError: any) {
+        // Si una foto falla, se revierte lo ya subido para no dejar basura.
+        await purgeImages(savedPhotoIds);
+        throw uploadError;
       }
-    });
 
-    // Borrar usuarios es la operación más destructiva: solo administración.
+      // Vectores: usa las URLs de Cloudinary (ya subidas arriba).
+      const cloudinaryUrls = photos.map(p => p.photoUrl);
+      const vectors = await requestFaceEmbeddings(cloudinaryUrls);
+
+      const enrollment = await saveFaceEnrollment(target.id, { photos, embeddings: vectors ?? [] });
+
+      // Actualizar avatar del usuario con la primera foto del enrolamiento (frontal)
+      if (photos.length > 0) {
+        await updateUser(target.id, {
+          avatarUrl: photos[0].photoUrl,
+          avatarPublicId: photos[0].photoPublicId,
+        });
+      }
+
+      // Las fotos anteriores dejan de ser necesarias: se borran del almacen.
+      const previousPhotos = (target.enrollmentPhotos ?? [])
+        .filter(old => !savedPhotoIds.includes(old.photoPublicId))
+        .map(old => old.photoPublicId);
+      const orphanedPhotos = await purgeImages(previousPhotos);
+
+      res.status(201).json({
+        enrollment,
+        vectorsGenerated: vectors ? vectors.length : 0,
+        pendingReason: vectors
+          ? null
+          : 'Las fotos se guardaron, pero faltan los vectores: el servicio de IA (Python) aun no esta implementado.',
+        storage: isCloudinaryConfigured() ? 'cloudinary' : 'local',
+        orphanedPhotos,
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/users/:id/face-enrollment', authenticateToken, async (req, res) => {
+    try {
+      const sessionUser = (req as any).user as { id: string; role: UserRole };
+      const isOwner = sessionUser.id === req.params.id as string;
+      if (!isOwner && sessionUser.role !== 'admin') {
+        return res.status(403).json({ error: 'Solo puedes eliminar tu propio enrolamiento facial' });
+      }
+
+      const target = await findUserById(req.params.id as string);
+      if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+      // El registro en la base se limpia siempre; lo que no se borre en el
+      // almacen externo se reporta como huerfano para limpiarlo a mano.
+      const orphanedPhotos = await purgeImages((target.enrollmentPhotos ?? []).map(p => p.photoPublicId));
+      const enrollment = await saveFaceEnrollment(target.id, { photos: [], embeddings: [] });
+
+      res.json({
+        enrollment,
+        deletedPhotos: (target.enrollmentPhotos ?? []).length,
+        orphanedPhotos,
+        notice: orphanedPhotos.length > 0
+          ? `${orphanedPhotos.length} foto(s) quedaron en el almacen externo y deben borrarse a mano.`
+          : null,
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Borrar usuarios es la operación más destructiva: solo administración.
   app.delete('/api/users/:id', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
       if (req.params.id as string === (req as any).user?.id) {
@@ -789,42 +818,41 @@ app.patch('/api/users/me/password', authenticateToken, async (req, res) => {
 
   // --- RECONOCIMIENTO FACIAL PARA ENTRADA Y SALIDA PEATONAL (RF-03, RF-05, RF-08, RF-11) ---
 
-    // Obtener candidatos biométricos registrados para el módulo de cámara
-    app.get('/api/recognition/candidates', authenticateToken, requireRole('admin', 'security'), async (_req, res) => {
-      try {
-        const users = await getAllUsers();
-        // Solo entran quienes tienen enrolment real: antes esto devolvía
-        // faceEnrolled: true fijo y listaba a todo el mundo como inscrito.
-        const candidates = users
-          .map(u => {
-            const enrollment = summarizeEnrollment(u);
-            return {
-              id: u.id,
-              name: u.name,
-              role: u.role,
-              documentId: u.documentId,
-              avatarUrl: u.avatarUrl,
-              facultyOrDept: u.facultyOrDept,
-              status: u.status,
-              faceEnrolled: enrollment.status === 'enrolled',
-              enrollmentStatus: enrollment.status,
-              templatesCount: enrollment.templatesCount,
-              photosCount: enrollment.photosCount,
-            };
-          })
-          .filter(c => c.status === 'active')
-          .sort((a, b) => a.name.localeCompare(b.name, 'es'));
-        res.json(candidates);
-      } catch (err: any) {
-        res.status(500).json({ error: err.message });
-      }
-    });
+  // Obtener candidatos biométricos registrados para el módulo de cámara
+  app.get('/api/recognition/candidates', authenticateToken, requireRole('admin', 'security'), async (_req, res) => {
+    try {
+      const users = await getAllUsers();
+      // Solo entran quienes tienen enrolment real: antes esto devolvía
+      // faceEnrolled: true fijo y listaba a todo el mundo como inscrito.
+      const candidates = users
+        .map(u => {
+          const enrollment = summarizeEnrollment(u);
+          return {
+            id: u.id,
+            name: u.name,
+            role: u.role,
+            documentId: u.documentId,
+            avatarUrl: u.avatarUrl,
+            facultyOrDept: u.facultyOrDept,
+            status: u.status,
+            faceEnrolled: enrollment.status === 'enrolled',
+            enrollmentStatus: enrollment.status,
+            templatesCount: enrollment.templatesCount,
+            photosCount: enrollment.photosCount,
+          };
+        })
+        .filter(c => c.status === 'active')
+        .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+      res.json(candidates);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // Verificación facial en tiempo real para Entrada o Salida peatonal
   app.post('/api/recognition/verify-face', authenticateToken, requireRole('admin', 'security'), async (req, res) => {
     try {
       const {
-        matchedUserId,
         direction = 'entry', // 'entry' (Entrada) | 'exit' (Salida)
         entryPoint = direction === 'entry' ? 'Torniquetes Entrada Cra 5' : 'Torniquetes Salida Cra 5',
         snapshotUrl,
@@ -834,17 +862,25 @@ app.patch('/api/users/me/password', authenticateToken, async (req, res) => {
       const isEntry = direction === 'entry';
       const actionName = isEntry ? 'Ingreso' : 'Salida';
 
-      if (!matchedUserId) {
-        // Persona no identificada en el sistema
+      if (!snapshotUrl) {
+        return res.status(400).json({ error: 'snapshotUrl es obligatorio' });
+      }
+
+      // La IA decide quién es (o si no es nadie).
+      const { match, distance } = await identifyFace(snapshotUrl);
+      const confidence = match ? Number((1 - distance).toFixed(4)) : 0;
+
+      if (!match) {
+        // Persona no identificada en la BD -> bitácora + alerta al celador (fase 3)
         const deniedLog = await addAccessLog({
           direction: direction as AccessDirection,
           entryPoint,
           method: 'facial_recognition',
           status: 'denied',
           userName: 'Persona No Identificada',
-          userRole: 'desconocido',
-          confidenceScore: 0.41,
-          notes: manualNotes || `ALERTA (RF-08): Rostro no registrado en Uniminuto. Torniquete de ${actionName} bloqueado.`,
+          userRole: 'desconocido' as UserRole | 'desconocido',
+          confidenceScore: confidence,
+          notes: manualNotes || `ALERTA (RF-08): Rostro no reconocido en Uniminuto. Torniquete de ${actionName} bloqueado. Distancia: ${distance.toFixed(3)}`,
           snapshotUrl,
         });
 
@@ -861,27 +897,17 @@ app.patch('/api/users/me/password', authenticateToken, async (req, res) => {
         });
       }
 
-        const user = await findUserById(matchedUserId);
-        if (!user) {
-          return res.status(404).json({ error: 'Perfil de usuario no encontrado' });
-        }
+      const user = match;
+      const enrollment = summarizeEnrollment(user);
+      if (enrollment.status !== 'enrolled') {
+        return res.status(409).json({
+          error: 'El usuario no tiene enrolamiento facial completo.',
+          enrollmentStatus: enrollment.status,
+          authorized: false,
+        });
+      }
 
-        // No se puede "reconocer" a quien no tiene enrolment real: sin vectores
-        // no hay nada que comparar. Antes esta ruta aceptaba cualquier id.
-        const enrollment = summarizeEnrollment(user);
-        if (enrollment.status !== 'enrolled') {
-          return res.status(409).json({
-            error:
-              enrollment.status === 'photos_pending'
-                ? 'El usuario tiene fotos capturadas pero sin vectores: el reconocimiento facial no esta operativo todavia.'
-                : 'El usuario no tiene enrolamiento facial registrado.',
-            enrollmentStatus: enrollment.status,
-            authorized: false,
-          });
-        }
-
-        const isAuthorized: AccessStatus = user.status === 'active' ? 'authorized' : 'denied';
-        const confidence = Number((0.94 + Math.random() * 0.05).toFixed(2));
+      const isAuthorized: AccessStatus = user.status === 'active' ? 'authorized' : 'denied';
 
       const logNotes = isAuthorized === 'authorized'
         ? `${actionName} peatonal autorizado por reconocimiento facial (${(confidence * 100).toFixed(1)}%). Torniquete habilitado.`
@@ -894,7 +920,7 @@ app.patch('/api/users/me/password', authenticateToken, async (req, res) => {
         status: isAuthorized,
         userId: user.id,
         userName: user.name,
-        userRole: user.role,
+        userRole: user.role as UserRole,
         documentId: user.documentId,
         confidenceScore: confidence,
         notes: logNotes,
@@ -910,11 +936,11 @@ app.patch('/api/users/me/password', authenticateToken, async (req, res) => {
           role: user.role,
           documentId: user.documentId,
           facultyOrDept: user.facultyOrDept,
-            avatarUrl: user.avatarUrl,
-            status: user.status,
-            faceEnrolled: enrollment.status === 'enrolled',
-            enrollmentStatus: enrollment.status,
-          },
+          avatarUrl: user.avatarUrl,
+          status: user.status,
+          faceEnrolled: enrollment.status === 'enrolled',
+          enrollmentStatus: enrollment.status,
+        },
         confidence,
         log,
         message: isAuthorized === 'authorized'
@@ -928,6 +954,24 @@ app.patch('/api/users/me/password', authenticateToken, async (req, res) => {
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+  
+  // Subir snapshot de reconocimiento (para evidencia y procesamiento IA)
+  // NO requiere avatar previo, a diferencia de /api/users/me/avatar
+  app.post('/api/recognition/upload-snapshot', authenticateToken, requireRole('admin', 'security'), async (req, res) => {
+    try {
+      const { dataUrl } = req.body;
+      if (!dataUrl) return res.status(400).json({ error: 'Snapshot requerido' });
+
+      const stored = await storeImage({
+        dataUrl,
+        folder: 'recognition_snapshots',
+        publicId: `snap_${(req as any).user.id}_${Date.now()}`,
+      });
+      res.json({ url: stored.url, publicId: stored.publicId, provider: stored.provider });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
     }
   });
 

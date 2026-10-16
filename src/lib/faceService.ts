@@ -61,8 +61,14 @@ export async function requestFaceEmbeddings(images: string[]): Promise<number[][
     const data: any = await response.json();
     const vectors = data?.vectors;
     if (!Array.isArray(vectors) || vectors.length !== images.length) return null;
-    if (!vectors.every(isValidVector)) return null;
-    return vectors;
+    
+    // Filtrar vectores nulos (imágenes no encontradas o sin rostro detectable)
+    const validVectors = vectors.filter((v): v is number[] => 
+      Array.isArray(v) && v.length > 0 && v.every((n) => typeof n === 'number' && Number.isFinite(n))
+    );
+    
+    if (validVectors.length === 0) return null;
+    return validVectors;
   } catch {
     return null;
   } finally {
@@ -83,4 +89,45 @@ export function cosineDistance(a: number[], b: number[]): number {
   }
   if (!na || !nb) return 1;
   return 1 - dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+export type FaceMatchResult = {
+  match: {
+    id: string;
+    name: string;
+    role: string;
+    faceEmbeddings: number[][];
+    status: string;
+    documentId: string;
+    facultyOrDept: string;
+    avatarUrl: string;
+  } | null;
+  distance: number;
+};
+
+/**
+ * Identifica un rostro comparando su vector contra TODOS los usuarios con enrolamiento.
+ * Devuelve el usuario mas cercano si la distancia es <= umbral, sino null.
+ */
+export async function identifyFace(snapshotUrl: string): Promise<FaceMatchResult> {
+  const vectors = await requestFaceEmbeddings([snapshotUrl]);
+  if (!vectors?.[0]) return { match: null, distance: 1 };
+
+  const { getAllUsersWithEmbeddings } = await import('../db/index.ts');
+  const usuarios = await getAllUsersWithEmbeddings();
+
+  let mejor = { usuario: null as any, distancia: Infinity };
+
+  for (const u of usuarios) {
+    if (!u.faceEmbeddings || u.faceEmbeddings.length === 0) continue;
+    for (const vec of u.faceEmbeddings) {
+      const d = cosineDistance(vectors[0], vec);
+      if (d < mejor.distancia) mejor = { usuario: u, distancia: d };
+    }
+  }
+
+  const umbral = Number(process.env.FACE_MATCH_THRESHOLD) || 0.45;
+  return mejor.distancia <= umbral
+    ? { match: mejor.usuario, distance: mejor.distancia }
+    : { match: null, distance: mejor.distancia };
 }

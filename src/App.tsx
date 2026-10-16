@@ -11,7 +11,6 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { TechnicalInfoModal } from './components/TechnicalInfoModal';
 import { EditProfileView } from './components/EditProfileView';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
-import { AvatarModal } from './components/AvatarModal';
 import { storeToken, clearStoredToken } from './lib/api';
 import type { UserProfile, AccessLog, SystemStats } from './types';
 import { authFetch } from './lib/api';
@@ -33,7 +32,6 @@ export default function App() {
   // Modals
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isTechInfoOpen, setIsTechInfoOpen] = useState(false);
-  const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   // Global system collections
@@ -231,7 +229,6 @@ export default function App() {
             currentUser={currentUser}
             onCancel={() => setActiveView('main')}
             onUserUpdated={handleUserUpdated}
-            onOpenAvatarModal={() => setIsAvatarOpen(true)}
             onOpenChangePassword={() => setIsChangePasswordOpen(true)}
             darkMode={darkMode}
           />
@@ -660,19 +657,6 @@ export default function App() {
         onClose={() => setIsTechInfoOpen(false)}
         darkMode={darkMode}
       />
-
-      {currentUser && (
-        <AvatarModal
-          isOpen={isAvatarOpen}
-          onClose={() => setIsAvatarOpen(false)}
-          darkMode={darkMode}
-          userId={currentUser.id}
-          userName={currentUser.name}
-          currentAvatarUrl={currentUser.avatarUrl}
-          onUserUpdated={handleUserUpdated}
-          onRefresh={fetchData}
-        />
-      )}
 
       {currentUser && (
         <ChangePasswordModal

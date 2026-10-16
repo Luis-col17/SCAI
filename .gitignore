@@ -25,3 +25,11 @@ src/assets/
 *.njsproj
 *.sln
 *.sw?
+
+Thumbs.db
+.vscode/
+.idea/
+
+#models 
+*.onnx.venv/
+.venv/
